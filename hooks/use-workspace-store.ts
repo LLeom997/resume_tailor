@@ -1,4 +1,12 @@
 import { create } from "zustand"
+import { buildVariantNameFromAnalysis, buildMonthYearSuffix } from "@/lib/resume-filename"
+
+const getSessionId = () => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("resumeBuilderSessionId") || ""
+  }
+  return ""
+}
 
 export type ResumeStatus =
   | "draft"
@@ -48,6 +56,19 @@ export interface ResumeActivity {
   created_at: string
 }
 
+export interface BackgroundTask {
+  id: string
+  type: "analyze" | "generate"
+  title: string
+  subtitle: string
+  progress: number
+  isCompleted: boolean
+  estimatedDurationMs: number
+  targetUrl?: string
+  status: "running" | "completed" | "error"
+  metadata?: any
+}
+
 interface WorkspaceState {
   personas: Persona[]
   variations: ResumeVariation[]
@@ -80,6 +101,24 @@ interface WorkspaceState {
   trackActivity: (personaId: string, variationId: string, actionType: string, metadata?: any) => Promise<void>
   setSortBy: (sortBy: "name" | "recent" | "usage") => void
   setFilterStatus: (status: ResumeStatus | "all") => void
+  activeTask: BackgroundTask | null
+  setActiveTask: (task: BackgroundTask | null) => void
+  updateTaskProgress: (progress: number, isCompleted?: boolean, status?: "running" | "completed" | "error") => void
+  runAnalyzeJob: (
+    sessionId: string,
+    masterResumeId: string,
+    jobDescription: string
+  ) => Promise<void>
+  runFinalizeJob: (
+    sessionId: string,
+    masterResumeId: string,
+    jobDescription: string,
+    analysis: any,
+    approvedChanges: any[],
+    profileId: string | null,
+    profileName: string | null
+  ) => Promise<void>
+  dismissTask: () => void
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -87,6 +126,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   variations: [],
   activity: [],
   isLoading: false,
+  activeTask: null,
   sortBy: "recent",
   filterStatus: "all",
 
@@ -102,7 +142,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const response = await fetch("/api/personas", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-session-id": getSessionId()
+        },
         body: JSON.stringify({ name, description, icon, color }),
       })
       if (response.ok) {
@@ -129,6 +172,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       await fetch(`/api/personas/${personaId}`, {
         method: "DELETE",
+        headers: {
+          "x-session-id": getSessionId()
+        }
       })
     } catch (error) {
       console.error("Failed to delete persona:", error)
@@ -149,6 +195,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       await fetch(`/api/personas/${personaId}/usage`, {
         method: "POST",
+        headers: {
+          "x-session-id": getSessionId()
+        }
       })
     } catch (error) {
       console.error("Failed to sync persona usage:", error)
@@ -159,7 +208,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const response = await fetch("/api/variations", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-session-id": getSessionId()
+        },
         body: JSON.stringify(variation),
       })
       if (response.ok) {
@@ -196,7 +248,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       await fetch(`/api/variations/${variationId}/status`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-session-id": getSessionId()
+        },
         body: JSON.stringify({ status }),
       })
       if (personaId) {
@@ -211,7 +266,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const response = await fetch("/api/activity", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-session-id": getSessionId()
+        },
         body: JSON.stringify({ persona_id: personaId, variation_id: variationId, action_type: actionType, metadata }),
       })
       if (response.ok) {
@@ -234,7 +292,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       await fetch(`/api/variations/${variationId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-session-id": getSessionId()
+        },
         body: JSON.stringify(details),
       })
     } catch (error) {
@@ -244,4 +305,234 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   setSortBy: (sortBy) => set({ sortBy }),
   setFilterStatus: (filterStatus) => set({ filterStatus }),
+  setActiveTask: (activeTask) => set({ activeTask }),
+  updateTaskProgress: (progress, isCompleted = false, status = "running") => set((state) => {
+    if (!state.activeTask) return {}
+    return {
+      activeTask: {
+        ...state.activeTask,
+        progress,
+        isCompleted,
+        status
+      }
+    }
+  }),
+  dismissTask: () => set({ activeTask: null }),
+
+  runAnalyzeJob: async (sessionId, masterResumeId, jobDescription) => {
+    const taskId = `analyze-${masterResumeId}-${Date.now()}`
+    
+    set({
+      activeTask: {
+        id: taskId,
+        type: "analyze",
+        title: "Analyzing Job Description",
+        subtitle: "AI is scanning JD parameters, extracting domain keywords, and identifying gaps",
+        progress: 0,
+        isCompleted: false,
+        estimatedDurationMs: 9000,
+        status: "running",
+        targetUrl: `/generate/${masterResumeId}`
+      }
+    })
+
+    // Simulate progress ticking
+    let currentProgress = 0
+    const intervalTime = 90 // 9000ms / 100
+    const progressInterval = setInterval(() => {
+      const active = get().activeTask
+      if (!active || active.status !== "running") {
+        clearInterval(progressInterval)
+        return
+      }
+
+      if (currentProgress >= 92) {
+        currentProgress = Math.min(97, currentProgress + 0.04)
+      } else {
+        const remaining = 92 - currentProgress
+        const step = Math.max(0.15, remaining / 20)
+        currentProgress += step
+      }
+
+      set((state) => ({
+        activeTask: state.activeTask ? { ...state.activeTask, progress: currentProgress } : null
+      }))
+    }, intervalTime)
+
+    try {
+      const response = await fetch('/api/generate-resume', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-id': sessionId,
+        },
+        body: JSON.stringify({
+          action: 'analyze',
+          master_resume_id: masterResumeId,
+          job_description: jobDescription,
+        }),
+      })
+
+      const data = await response.json()
+      clearInterval(progressInterval)
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to analyze')
+      }
+
+      // Smooth transition to 100%
+      set((state) => ({
+        activeTask: state.activeTask ? {
+          ...state.activeTask,
+          progress: 100,
+          isCompleted: true,
+          status: "completed",
+          targetUrl: `/generate/${masterResumeId}`,
+          metadata: {
+            analysis: data.analysis,
+            jobDescription
+          }
+        } : null
+      }))
+    } catch (error: any) {
+      clearInterval(progressInterval)
+      console.error(error)
+      set((state) => ({
+        activeTask: state.activeTask ? {
+          ...state.activeTask,
+          status: "error",
+          metadata: { error: error.message || "Failed to analyze" }
+        } : null
+      }))
+    }
+  },
+
+  runFinalizeJob: async (sessionId, masterResumeId, jobDescription, analysis, approvedChanges, profileId, profileName) => {
+    const taskId = `finalize-${masterResumeId}-${Date.now()}`
+    
+    set({
+      activeTask: {
+        id: taskId,
+        type: "generate",
+        title: "Synthesizing Tailored Resume",
+        subtitle: "AI is assembling approved modifications and building print-perfect layouts",
+        progress: 0,
+        isCompleted: false,
+        estimatedDurationMs: 7000,
+        status: "running",
+        targetUrl: `/preview/pending` // We will overwrite this once we get the ID!
+      }
+    })
+
+    // Simulate progress ticking
+    let currentProgress = 0
+    const intervalTime = 70 // 7000ms / 100
+    const progressInterval = setInterval(() => {
+      const active = get().activeTask
+      if (!active || active.status !== "running") {
+        clearInterval(progressInterval)
+        return
+      }
+
+      if (currentProgress >= 92) {
+        currentProgress = Math.min(97, currentProgress + 0.04)
+      } else {
+        const remaining = 92 - currentProgress
+        const step = Math.max(0.15, remaining / 20)
+        currentProgress += step
+      }
+
+      set((state) => ({
+        activeTask: state.activeTask ? { ...state.activeTask, progress: currentProgress } : null
+      }))
+    }, intervalTime)
+
+    try {
+      const response = await fetch('/api/generate-resume', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-id': sessionId,
+        },
+        body: JSON.stringify({
+          action: 'finalize',
+          master_resume_id: masterResumeId,
+          job_description: jobDescription,
+          analysis,
+          approved_changes: approvedChanges,
+          profile_id: profileId,
+          profile_name: profileName,
+        }),
+      })
+
+      const generatedResume = await response.json()
+      clearInterval(progressInterval)
+
+      if (!response.ok) {
+        throw new Error(generatedResume.error || 'Failed to generate')
+      }
+
+      // Add variant to store optimistically if profileId is present
+      if (profileId) {
+        const namingInput = buildVariantNameFromAnalysis(analysis, generatedResume.content.basics.headline)
+        const monthYear = buildMonthYearSuffix()
+        
+        const newVariation: ResumeVariation = {
+          id: generatedResume.id,
+          persona_id: profileId,
+          master_resume_id: masterResumeId,
+          company_name: namingInput.company || 'Company',
+          role_title: namingInput.role || 'Role',
+          status: 'tailored',
+          version: 1,
+          jd_text: jobDescription,
+          resume_content: generatedResume.content,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          status_updated_at: new Date().toISOString(),
+        }
+
+        const newActivity: ResumeActivity = {
+          id: `act-${Date.now()}`,
+          persona_id: profileId,
+          variation_id: generatedResume.id,
+          action_type: 'optimize',
+          metadata: {
+            company: namingInput.company,
+            role: namingInput.role,
+          },
+          created_at: new Date().toISOString()
+        }
+
+        set((state) => ({
+          variations: [...state.variations.filter(v => v.id !== generatedResume.id), newVariation],
+          activity: [newActivity, ...state.activity]
+        }))
+      }
+
+      // Smooth transition to 100%
+      set((state) => ({
+        activeTask: state.activeTask ? {
+          ...state.activeTask,
+          progress: 100,
+          isCompleted: true,
+          status: "completed",
+          targetUrl: `/preview/${generatedResume.id}`,
+          metadata: {
+            generatedResume
+          }
+        } : null
+      }))
+    } catch (error: any) {
+      clearInterval(progressInterval)
+      console.error(error)
+      set((state) => ({
+        activeTask: state.activeTask ? {
+          ...state.activeTask,
+          status: "error",
+          metadata: { error: error.message || "Failed to generate" }
+        } : null
+      }))
+    }
+  },
 }))

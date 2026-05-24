@@ -30,6 +30,8 @@ export const metadata: Metadata = {
   },
 }
 
+import { BackgroundTaskPill } from '@/components/background-task-pill'
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -43,6 +45,7 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <SessionProvider>
           {children}
+          <BackgroundTaskPill />
           {process.env.NODE_ENV === 'production' && <Analytics />}
         </SessionProvider>
       </body>

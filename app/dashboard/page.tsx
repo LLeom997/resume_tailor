@@ -22,8 +22,11 @@ import {
   CheckCircle2, 
   AlertCircle,
   Trash2,
-  Share2
+  Share2,
+  X
 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 
 export default function DashboardPage() {
   const { sessionId, isLoading } = useSession()
@@ -32,6 +35,12 @@ export default function DashboardPage() {
   const [masterResume, setMasterResume] = useState<any>(null)
   const [isLoadingMaster, setIsLoadingMaster] = useState(true)
   const [copiedSync, setCopiedSync] = useState(false)
+  const [showAddPersona, setShowAddPersona] = useState(false)
+  const [newPersonaName, setNewPersonaName] = useState('')
+  const [newPersonaDesc, setNewPersonaDesc] = useState('')
+  const [newPersonaIcon, setNewPersonaIcon] = useState('Briefcase')
+  const [newPersonaColor, setNewPersonaColor] = useState('zinc')
+  const [isSubmittingPersona, setIsSubmittingPersona] = useState(false)
 
   // Fetch all initial workspace data
   useEffect(() => {
@@ -205,7 +214,12 @@ export default function DashboardPage() {
           <div className="lg:col-span-2 space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold tracking-tight text-zinc-800">Dynamic Career Personas</h2>
-              <Button size="xs" variant="outline" className="gap-1.5 text-xs text-zinc-600">
+              <Button 
+                size="xs" 
+                variant="outline" 
+                onClick={() => setShowAddPersona(true)}
+                className="gap-1.5 text-xs text-zinc-600 cursor-pointer"
+              >
                 <Plus className="w-3 h-3" /> Add Persona
               </Button>
             </div>
@@ -358,6 +372,109 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+
+      {/* ADD PERSONA DIALOG MODAL */}
+      {showAddPersona && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/65 backdrop-blur-xs animate-in fade-in duration-200">
+          <Card className="w-full max-w-md mx-4 shadow-2xl border-zinc-200 bg-white">
+            <CardHeader className="pb-3 border-b border-zinc-100 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold text-zinc-800">Add Career Persona</CardTitle>
+                <CardDescription className="text-[10px] mt-0.5">Create a focused career target workspace</CardDescription>
+              </div>
+              <button 
+                onClick={() => setShowAddPersona(false)}
+                className="text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 p-1 rounded-md transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4 text-xs font-medium">
+              <div className="space-y-1">
+                <label className="text-zinc-650">Persona Name</label>
+                <Input
+                  value={newPersonaName}
+                  onChange={(e) => setNewPersonaName(e.target.value)}
+                  placeholder="e.g. Lead Robotics Engineer"
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-zinc-650">Description</label>
+                <Textarea
+                  value={newPersonaDesc}
+                  onChange={(e) => setNewPersonaDesc(e.target.value)}
+                  placeholder="Focus on robot dynamics, controls, motion planning, and ROS2..."
+                  rows={3}
+                  className="text-xs"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-zinc-650">Icon</label>
+                  <select
+                    value={newPersonaIcon}
+                    onChange={(e) => setNewPersonaIcon(e.target.value)}
+                    className="w-full h-9 rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs font-medium"
+                  >
+                    <option value="Briefcase">💼 Business</option>
+                    <option value="Code">💻 Tech/Code</option>
+                    <option value="Cpu">🤖 Systems/AI</option>
+                    <option value="Brain">🧠 Research</option>
+                    <option value="FolderKanban">📁 Product</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-zinc-650">Theme Color</label>
+                  <select
+                    value={newPersonaColor}
+                    onChange={(e) => setNewPersonaColor(e.target.value)}
+                    className="w-full h-9 rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs font-medium"
+                  >
+                    <option value="zinc">Zinc Grey</option>
+                    <option value="blue">Blue Sky</option>
+                    <option value="purple">Purple Aura</option>
+                    <option value="emerald">Emerald Mint</option>
+                    <option value="amber">Amber Gold</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end border-t border-zinc-100 pt-4 mt-2">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => setShowAddPersona(false)}
+                  disabled={isSubmittingPersona}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  size="sm"
+                  disabled={!newPersonaName.trim() || isSubmittingPersona}
+                  onClick={async () => {
+                    setIsSubmittingPersona(true)
+                    try {
+                      await store.addPersona(newPersonaName, newPersonaDesc, newPersonaIcon, newPersonaColor)
+                      setShowAddPersona(false)
+                      setNewPersonaName('')
+                      setNewPersonaDesc('')
+                    } catch (e) {
+                      console.error(e)
+                    } finally {
+                      setIsSubmittingPersona(false)
+                    }
+                  }}
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white"
+                >
+                  {isSubmittingPersona ? 'Creating...' : 'Create Persona'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

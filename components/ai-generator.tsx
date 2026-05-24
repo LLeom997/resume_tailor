@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { AlertCircle, CheckCircle2, Loader2, RotateCcw, Sparkles } from 'lucide-react'
 import { InteractiveProgress } from '@/components/interactive-progress'
+import { useWorkspaceStore } from '@/hooks/use-workspace-store'
 
 interface AIGeneratorProps {
   masterResume: Resume
@@ -29,6 +30,46 @@ export function AIGenerator({ masterResume, profileId: initialProfileId, onGener
   const [isAnalyzeCompleted, setIsAnalyzeCompleted] = useState(false)
   const [isGenerateCompleted, setIsGenerateCompleted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  const store = useWorkspaceStore()
+  const activeTask = store.activeTask
+
+  useEffect(() => {
+    if (!activeTask) return
+
+    if (activeTask.type === 'analyze') {
+      if (activeTask.status === 'running') {
+        setIsAnalyzing(true)
+        setIsAnalyzeCompleted(false)
+      } else if (activeTask.status === 'completed') {
+        setIsAnalyzeCompleted(true)
+        if (activeTask.metadata?.analysis) {
+          setAnalysis(activeTask.metadata.analysis)
+          if (activeTask.metadata.jobDescription) {
+            setJobDescription(activeTask.metadata.jobDescription)
+          }
+          setApprovedChangeIds(new Set(activeTask.metadata.analysis.proposedChanges.map((c: any) => c.id)))
+        }
+      } else if (activeTask.status === 'error') {
+        setIsAnalyzeCompleted(true)
+        setError(activeTask.metadata?.error || 'Analysis failed')
+      }
+    } else if (activeTask.type === 'generate') {
+      if (activeTask.status === 'running') {
+        setIsGenerating(true)
+        setIsGenerateCompleted(false)
+      } else if (activeTask.status === 'completed') {
+        setIsGenerateCompleted(true)
+        if (activeTask.metadata?.generatedResume) {
+          onGenerateComplete?.(activeTask.metadata.generatedResume)
+          store.dismissTask()
+        }
+      } else if (activeTask.status === 'error') {
+        setIsGenerateCompleted(true)
+        setError(activeTask.metadata?.error || 'Generation failed')
+      }
+    }
+  }, [activeTask])
 
   useEffect(() => {
     if (!sessionId) return
@@ -61,39 +102,10 @@ export function AIGenerator({ masterResume, profileId: initialProfileId, onGener
       return
     }
 
+    setError(null)
     setIsAnalyzing(true)
     setIsAnalyzeCompleted(false)
-    setError(null)
-
-    try {
-      const response = await fetch('/api/generate-resume', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-session-id': sessionId,
-        },
-        body: JSON.stringify({
-          action: 'analyze',
-          master_resume_id: masterResume.id,
-          job_description: jobDescription,
-        }),
-      })
-
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to analyze job description')
-      }
-
-      setAnalysis(data.analysis)
-      setApprovedChangeIds(new Set(data.analysis.proposedChanges.map((change: ProposedResumeChange) => change.id)))
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      setError(message)
-      console.error('Error analyzing job description:', err)
-      setIsAnalyzeCompleted(true)
-    } finally {
-      setIsAnalyzeCompleted(true)
-    }
+    store.runAnalyzeJob(sessionId, masterResume.id, jobDescription)
   }
 
   const handleFinalize = async () => {
@@ -105,43 +117,20 @@ export function AIGenerator({ masterResume, profileId: initialProfileId, onGener
       return
     }
 
+    setError(null)
     setIsGenerating(true)
     setIsGenerateCompleted(false)
-    setError(null)
-
-    try {
-      const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId)
-      const response = await fetch('/api/generate-resume', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-session-id': sessionId,
-        },
-        body: JSON.stringify({
-          action: 'finalize',
-          master_resume_id: masterResume.id,
-          job_description: jobDescription,
-          analysis,
-          approved_changes: approvedChanges,
-          profile_id: selectedProfileId || null,
-          profile_name: selectedProfile?.name || null,
-        }),
-      })
-
-      const generatedResume = await response.json()
-      if (!response.ok) {
-        throw new Error(generatedResume.error || 'Failed to generate final resume')
-      }
-
-      onGenerateComplete?.(generatedResume)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      setError(message)
-      console.error('Error generating final resume:', err)
-      setIsGenerateCompleted(true)
-    } finally {
-      setIsGenerateCompleted(true)
-    }
+    
+    const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId)
+    store.runFinalizeJob(
+      sessionId,
+      masterResume.id,
+      jobDescription,
+      analysis,
+      approvedChanges,
+      selectedProfileId || null,
+      selectedProfile?.name || null
+    )
   }
 
   const toggleChange = (id: string) => {
@@ -178,7 +167,11 @@ export function AIGenerator({ masterResume, profileId: initialProfileId, onGener
           title="Analyzing Job Description"
           subtitle="AI is scanning JD parameters, extracting domain keywords, and identifying gaps"
           isCompleted={isAnalyzeCompleted}
-          onClose={() => setIsAnalyzing(false)}
+          onClose={() => {
+            setIsAnalyzing(false)
+            store.dismissTask()
+          }}
+          onMinimize={() => setIsAnalyzing(false)}
           estimatedDurationMs={9000}
         />
       )}
@@ -187,7 +180,11 @@ export function AIGenerator({ masterResume, profileId: initialProfileId, onGener
           title="Synthesizing Tailored Resume"
           subtitle="AI is assembling approved modifications and building print-perfect layout structures"
           isCompleted={isGenerateCompleted}
-          onClose={() => setIsGenerating(false)}
+          onClose={() => {
+            setIsGenerating(false)
+            store.dismissTask()
+          }}
+          onMinimize={() => setIsGenerating(false)}
           estimatedDurationMs={7000}
         />
       )}

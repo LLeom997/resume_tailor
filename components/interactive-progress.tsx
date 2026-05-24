@@ -13,7 +13,8 @@ import {
   Code2, 
   CheckCircle2, 
   Hourglass, 
-  Eye
+  Eye,
+  Minimize2
 } from "lucide-react"
 
 interface InteractiveProgressProps {
@@ -22,6 +23,7 @@ interface InteractiveProgressProps {
   isCompleted?: boolean
   onClose?: () => void
   estimatedDurationMs?: number // Default: 7000ms
+  onMinimize?: () => void
 }
 
 export function InteractiveProgress({
@@ -30,6 +32,7 @@ export function InteractiveProgress({
   isCompleted = false,
   onClose,
   estimatedDurationMs = 7000,
+  onMinimize,
 }: InteractiveProgressProps) {
   const [progress, setProgress] = useState(0)
   const [currentStep, setCurrentStep] = useState(0)
@@ -253,6 +256,17 @@ export function InteractiveProgress({
               <Eye className="w-3 h-3" />
               {verbose ? "HIDE STREAM" : "SHOW STREAM"}
             </Button>
+            {onMinimize && (
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={onMinimize}
+                className="text-[10px] h-7 font-mono border-zinc-700 text-zinc-400 hover:text-zinc-100 bg-zinc-850 hover:bg-zinc-800 gap-1.5"
+              >
+                <Minimize2 className="w-3 h-3 text-zinc-400" />
+                RUN IN BACKGROUND
+              </Button>
+            )}
           </div>
           
           <div className="flex items-center gap-1.5 text-zinc-500 text-[10px] font-mono">
