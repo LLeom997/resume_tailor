@@ -105,7 +105,7 @@
   margin-top: 16px;
 }
 
-#resume-document .resume-columns > * {
+#resume-document .resume-columns>* {
   min-width: 0;
   max-width: 100%;
 }
@@ -288,7 +288,8 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 15mm 15mm 15mm 15mm; /* Clean standardized printable margins */
+    margin: 15mm 15mm 15mm 15mm;
+    /* Clean standardized printable margins */
   }
 
   html,
@@ -332,7 +333,8 @@
     width: 100% !important;
     max-width: 100% !important;
     min-height: 0 !important;
-    transform: none !important; /* Disable scale to let browser handle vector fonts cleanly */
+    transform: none !important;
+    /* Disable scale to let browser handle vector fonts cleanly */
     margin: 0 !important;
     padding: 0 !important;
     font-size: 11px !important;
@@ -361,9 +363,11 @@
   #resume-document .resume-sidebar {
     order: 2 !important;
     width: 100% !important;
-    border-top: 1px solid #e4e4e7 !important; /* Zinc separator */
+    border-top: 1px solid #e4e4e7 !important;
+    /* Zinc separator */
     padding-top: 16px !important;
-    border-right: none !important; /* Remove columns borderline */
+    border-right: none !important;
+    /* Remove columns borderline */
   }
 
   #resume-document.resume-sheet--enhanced .resume-sidebar {
