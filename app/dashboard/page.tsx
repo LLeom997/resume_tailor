@@ -21,7 +21,8 @@ import {
   TrendingUp, 
   CheckCircle2, 
   AlertCircle,
-  Trash2
+  Trash2,
+  Share2
 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -30,6 +31,7 @@ export default function DashboardPage() {
   
   const [masterResume, setMasterResume] = useState<any>(null)
   const [isLoadingMaster, setIsLoadingMaster] = useState(true)
+  const [copiedSync, setCopiedSync] = useState(false)
 
   // Fetch all initial workspace data
   useEffect(() => {
@@ -106,6 +108,23 @@ export default function DashboardPage() {
             </Badge>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs gap-1.5 shadow-sm border-zinc-200 text-zinc-650 hover:bg-zinc-50"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  const url = new URL(window.location.href)
+                  url.search = `?session=${sessionId || ''}`
+                  navigator.clipboard.writeText(url.toString())
+                  setCopiedSync(true)
+                  setTimeout(() => setCopiedSync(false), 2000)
+                }
+              }}
+            >
+              <Share2 className="w-3.5 h-3.5 text-zinc-500" />
+              {copiedSync ? 'Sync URL Copied!' : 'Sync to Vercel'}
+            </Button>
             {masterResume && (
               <Link href={`/preview/${masterResume.id}`}>
                 <Button size="sm" variant="outline" className="text-xs gap-1.5 shadow-sm">

@@ -24,7 +24,8 @@ import {
   Sparkles, 
   Plus, 
   Zap, 
-  Trash2, 
+  Trash2,
+  Share2,
   ExternalLink,
   ChevronDown,
   Settings
@@ -52,6 +53,7 @@ export default function PersonaWorkspacePage() {
   const [editCompany, setEditCompany] = useState("")
   const [editRole, setEditRole] = useState("")
   const [isSavingDetails, setIsSavingDetails] = useState(false)
+  const [copiedSync, setCopiedSync] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem('persona_view_mode')
@@ -71,7 +73,7 @@ export default function PersonaWorkspacePage() {
     const loadWorkspace = async () => {
       try {
         const [personaRes, variationsRes, masterRes] = await Promise.all([
-          fetch(`/api/personas`), // We can load from all and filter, or fetch direct
+          fetch(`/api/personas`, { headers: { 'x-session-id': sessionId } }),
           fetch(`/api/variations?persona_id=${personaId}`, { headers: { 'x-session-id': sessionId } }),
           fetch('/api/resumes', { headers: { 'x-session-id': sessionId } }),
         ])
@@ -79,10 +81,8 @@ export default function PersonaWorkspacePage() {
         if (variationsRes.ok) {
           const variations: ResumeVariation[] = await variationsRes.json()
           
-          // Filter personas from store or load them from DB
-          const pResponse = await fetch('/api/personas', { headers: { 'x-session-id': sessionId } })
-          if (pResponse.ok) {
-            const list: Persona[] = await pResponse.json()
+          if (personaRes.ok) {
+            const list: Persona[] = await personaRes.json()
             const found = list.find(p => p.id === personaId)
             setPersona(found || null)
             
@@ -317,7 +317,24 @@ export default function PersonaWorkspacePage() {
               <p className="text-xs text-zinc-500">{persona.description}</p>
             </div>
           </div>
-          <div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs gap-1.5 shadow-sm border-zinc-200 text-zinc-650 hover:bg-zinc-50"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  const url = new URL(window.location.origin)
+                  url.search = `?session=${sessionId || ''}`
+                  navigator.clipboard.writeText(url.toString())
+                  setCopiedSync(true)
+                  setTimeout(() => setCopiedSync(false), 2000)
+                }
+              }}
+            >
+              <Share2 className="w-3.5 h-3.5 text-zinc-500" />
+              {copiedSync ? 'Sync URL Copied!' : 'Sync to Vercel'}
+            </Button>
             {globalMaster ? (
               <Link href={`/generate/${globalMaster.id}?profile_id=${personaId}`}>
                 <Button size="sm" className="text-xs gap-1.5 shadow-sm">

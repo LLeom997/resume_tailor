@@ -15,15 +15,28 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check localStorage for existing session
-    const storedSessionId = localStorage.getItem('resumeBuilderSessionId')
-    if (storedSessionId) {
-      setSessionId(storedSessionId)
+    // Check query parameters first
+    const params = new URLSearchParams(window.location.search)
+    const urlSessionId = params.get('session') || params.get('sessionId')
+
+    if (urlSessionId) {
+      localStorage.setItem('resumeBuilderSessionId', urlSessionId)
+      setSessionId(urlSessionId)
+
+      // Clean up URL parameter cleanly without page reload
+      const cleanUrl = window.location.pathname + window.location.search.replace(/[?&]session(Id)?=[^&]*/gi, '')
+      window.history.replaceState({}, '', cleanUrl === '' ? '/' : cleanUrl)
     } else {
-      // Generate new session ID
-      const newSessionId = generateSessionId()
-      localStorage.setItem('resumeBuilderSessionId', newSessionId)
-      setSessionId(newSessionId)
+      // Check localStorage for existing session
+      const storedSessionId = localStorage.getItem('resumeBuilderSessionId')
+      if (storedSessionId) {
+        setSessionId(storedSessionId)
+      } else {
+        // Generate new session ID
+        const newSessionId = generateSessionId()
+        localStorage.setItem('resumeBuilderSessionId', newSessionId)
+        setSessionId(newSessionId)
+      }
     }
     setIsLoading(false)
   }, [])
