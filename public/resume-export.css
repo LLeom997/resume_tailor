@@ -13,26 +13,60 @@
   padding: 32px 36px;
   font-family: "Google Sans Text", "Google Sans", Arial, sans-serif;
   font-size: 11px;
-  line-height: 1.375;
+  line-height: 1.25 !important;
   color: #18181b;
   background: #ffffff;
   transform: scale(var(--resume-scale, 1));
   transform-origin: top left;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
 }
 
 #resume-document.resume-sheet *,
 #resume-document.resume-sheet *::before,
 #resume-document.resume-sheet *::after {
   box-sizing: border-box;
+  line-height: 1.25 !important;
+}
+
+/* #resume-document * {
+  outline: 1px solid rgba(255, 0, 0, 0.15);
+} */
+
+#resume-document p,
+#resume-document li,
+#resume-document span {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 #resume-document .resume-header {
   border-bottom: 2px solid #000000;
-  padding-bottom: 16px;
+  padding-bottom: 14px;
 }
 
 #resume-document.resume-sheet--enhanced .resume-header {
   border-bottom-color: #075985;
+}
+
+#resume-document .resume-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+#resume-document .resume-contact-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  font-size: 11px;
+  color: #3f3f46;
+}
+
+#resume-document .resume-contact-item {
+  line-height: 1.35;
 }
 
 #resume-document .resume-name {
@@ -44,17 +78,8 @@
   color: #000000;
 }
 
-#resume-document .resume-contact {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  margin-top: 8px;
-  font-size: 11px;
-  color: #3f3f46;
-}
-
 #resume-document .resume-headline {
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   font-size: 13px;
   font-weight: 600;
   color: #000000;
@@ -73,13 +98,21 @@
 
 #resume-document .resume-columns {
   display: grid;
-  grid-template-columns: 38% 62%;
-  gap: 24px;
-  margin-top: 20px;
+  grid-template-columns: minmax(0, 290px) minmax(0, 1fr);
+  column-gap: 18px;
+  align-items: start;
+  width: 100%;
+  margin-top: 16px;
+}
+
+#resume-document .resume-columns > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 #resume-document .resume-sidebar {
-  padding-right: 20px;
+  padding-right: 0;
+  min-width: 0;
 }
 
 #resume-document.resume-sheet--enhanced .resume-sidebar {
@@ -87,7 +120,7 @@
 }
 
 #resume-document .resume-section {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
   break-inside: auto;
   page-break-inside: auto;
 }
@@ -129,16 +162,22 @@
   color: #075985;
 }
 
-#resume-document .resume-stack > * + * {
-  margin-top: 10px;
+#resume-document .resume-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-#resume-document .resume-stack-sm > * + * {
-  margin-top: 6px;
+#resume-document .resume-stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-#resume-document .resume-stack-lg > * + * {
-  margin-top: 16px;
+#resume-document .resume-stack-lg {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 #resume-document .resume-bold {
@@ -164,7 +203,7 @@
 }
 
 #resume-document .resume-experience-item {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 #resume-document.resume-sheet--enhanced .resume-experience-item {
@@ -199,11 +238,11 @@
 }
 
 #resume-document .resume-experience-body {
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
-#resume-document .resume-experience-body > * + * {
-  margin-top: 6px;
+#resume-document .resume-experience-body>*+* {
+  margin-top: 4px;
 }
 
 #resume-document .resume-experience-line {
@@ -222,19 +261,46 @@
   color: #0c4a6e;
 }
 
+#resume-document .resume-highlight-keyword {
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+}
+
+#resume-document .resume-highlight-kpi {
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+}
+
+#resume-document.resume-sheet--enhanced .resume-highlight-keyword {
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+}
+
+#resume-document.resume-sheet--enhanced .resume-highlight-kpi {
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+}
+
 @media print {
   @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 15mm 15mm 15mm 15mm; /* Clean standardized printable margins */
   }
 
   html,
   body {
-    width: 210mm;
-    height: 297mm;
+    width: auto !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
+    font-family: "Google Sans Text", "Google Sans", Arial, sans-serif;
+    font-size: 11px;
+    line-height: 1.4 !important;
   }
 
   body * {
@@ -247,34 +313,72 @@
   }
 
   #resume-print-root {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 210mm;
-    height: 297mm;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    background: #ffffff;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
   }
 
-  #resume-print-root > div {
+  #resume-print-root>div {
     padding: 0 !important;
     margin: 0 !important;
   }
 
   #resume-document.resume-sheet {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 794px !important;
-    max-width: 794px !important;
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: 100% !important;
     min-height: 0 !important;
-    height: auto !important;
+    transform: none !important; /* Disable scale to let browser handle vector fonts cleanly */
     margin: 0 !important;
-    padding: 32px 36px !important;
+    padding: 0 !important;
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+    color: #18181b !important;
+    background: #ffffff !important;
     box-shadow: none !important;
-    transform: scale(var(--resume-scale, 1));
-    transform-origin: top left;
+  }
+
+  /* Single Column ATS-Safe Layout */
+  #resume-document .resume-columns {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 20px !important;
+    margin-top: 16px !important;
+  }
+
+  /* Experience main column rendered first for logical reading flow */
+  #resume-document .resume-main {
+    order: 1 !important;
+    width: 100% !important;
+  }
+
+  /* Sidebar blocks (Skills, Projects, Education, etc.) stacked second */
+  #resume-document .resume-sidebar {
+    order: 2 !important;
+    width: 100% !important;
+    border-top: 1px solid #e4e4e7 !important; /* Zinc separator */
+    padding-top: 16px !important;
+    border-right: none !important; /* Remove columns borderline */
+  }
+
+  #resume-document.resume-sheet--enhanced .resume-sidebar {
+    border-right: none !important;
+  }
+
+  #resume-document .resume-section {
+    margin-bottom: 20px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #resume-document .resume-experience-item {
+    margin-bottom: 14px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }

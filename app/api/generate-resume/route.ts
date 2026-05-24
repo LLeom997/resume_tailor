@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { ProposedResumeChange, ResumeContent, ResumeWorkflowAnalysis } from '@/lib/types'
 import { proposedChangeSchema, resumeContentSchema, workflowAnalysisSchema } from '@/lib/resume-ai-schemas'
-import { buildResumeExportBaseName, buildVariantNameFromAnalysis } from '@/lib/resume-filename'
+import { buildResumeExportBaseName, buildMonthYearSuffix, buildVariantNameFromAnalysis } from '@/lib/resume-filename'
+import { collectHighlightKeywords } from '@/lib/resume-highlight-terms'
+import { ResumeExportMeta } from '@/lib/types'
 import { generateObject } from 'ai'
 import { createOpenRouterClient } from '@/lib/openrouter-client'
 import { z } from 'zod'
@@ -125,13 +127,33 @@ export async function POST(request: NextRequest) {
 
       const analysis = body.analysis as ResumeWorkflowAnalysis | undefined
       const namingInput = buildVariantNameFromAnalysis(analysis, masterResume.content.basics.headline)
-      const variantName = buildResumeExportBaseName(namingInput)
+      const monthYear = buildMonthYearSuffix()
+      const variantName = buildResumeExportBaseName({ ...namingInput, monthYear })
 
-      const generatedResume = {
+      const highlightKeywords = collectHighlightKeywords(
+        analysis,
+        approvedChanges.flatMap((change) => change.keywords)
+      )
+
+      const exportMeta: ResumeExportMeta = {
+        company: namingInput.company,
+        role: namingInput.role,
+        monthYear,
+        keywords: highlightKeywords,
+        profile_id: body.profile_id || null,
+        profile_name: body.profile_name || null,
+      }
+
+      const generatedResume: Record<string, unknown> = {
         session_id: sessionId,
         name: variantName,
         content,
         is_master: false,
+        export_meta: exportMeta,
+      }
+
+      if (body.profile_id) {
+        generatedResume.profile_id = body.profile_id
       }
 
       const { data: savedResume, error: saveError } = await supabase
@@ -141,8 +163,109 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (saveError) {
-        console.error('Error saving generated resume:', saveError)
-        return NextResponse.json({ error: 'Failed to save generated resume' }, { status: 500 })
+        const fallbackResume = {
+          session_id: sessionId,
+          name: variantName,
+          content,
+          is_master: false,
+        }
+        const { data: fallbackSaved, error: fallbackError } = await supabase
+          .from('resumes')
+          .insert(fallbackResume)
+          .select()
+          .single()
+
+        if (fallbackError) {
+          console.error('Error saving generated resume:', saveError, fallbackError)
+          return NextResponse.json({ error: 'Failed to save generated resume' }, { status: 500 })
+        }
+
+        // Also save to resume_variations for Workspace OS tracking if profile_id is provided
+        if (body.profile_id) {
+          try {
+            await supabase.from('resume_variations').insert({
+              id: fallbackSaved.id,
+              session_id: sessionId,
+              persona_id: body.profile_id,
+              master_resume_id: body.master_resume_id || null,
+              company_name: namingInput.company || 'Company',
+              role_title: namingInput.role || 'Role',
+              status: 'tailored',
+              version: 1,
+              jd_text: body.job_description || '',
+              resume_content: content,
+              status_updated_at: new Date().toISOString(),
+            })
+
+            await supabase.from('resume_activity').insert({
+              session_id: sessionId,
+              persona_id: body.profile_id,
+              variation_id: fallbackSaved.id,
+              action_type: 'optimize',
+              metadata: {
+                company: namingInput.company,
+                role: namingInput.role,
+              },
+            })
+          } catch (varError) {
+            console.warn('Failed to insert fallback resume variation:', varError)
+          }
+        }
+
+        await supabase.from('job_applications').insert({
+          session_id: sessionId,
+          master_resume_id: body.master_resume_id,
+          job_description: body.job_description,
+          generated_resume_id: fallbackSaved.id,
+          ai_suggestions: {
+            workflow: 'jd_parse_keyword_intent_gap_suggestions_review_final_resume',
+            analysis: body.analysis,
+            approved_changes: approvedChanges,
+            export_naming: namingInput,
+            export_meta: exportMeta,
+            highlight_keywords: highlightKeywords,
+          },
+        })
+
+        return NextResponse.json(
+          {
+            ...fallbackSaved,
+            export_meta: exportMeta,
+          },
+          { status: 201 }
+        )
+      }
+
+      // Also save to resume_variations for Workspace OS tracking if profile_id is provided
+      if (body.profile_id) {
+        try {
+          await supabase.from('resume_variations').insert({
+            id: savedResume.id,
+            session_id: sessionId,
+            persona_id: body.profile_id,
+            master_resume_id: body.master_resume_id || null,
+            company_name: namingInput.company || 'Company',
+            role_title: namingInput.role || 'Role',
+            status: 'tailored',
+            version: 1,
+            jd_text: body.job_description || '',
+            resume_content: content,
+            status_updated_at: new Date().toISOString(),
+          })
+
+          await supabase.from('resume_activity').insert({
+            session_id: sessionId,
+            persona_id: body.profile_id,
+            variation_id: savedResume.id,
+            action_type: 'optimize',
+            metadata: {
+              company: namingInput.company,
+              role: namingInput.role,
+            },
+          })
+        } catch (varError) {
+          console.warn('Failed to insert resume variation:', varError)
+        }
       }
 
       await supabase.from('job_applications').insert({
@@ -155,6 +278,8 @@ export async function POST(request: NextRequest) {
           analysis: body.analysis,
           approved_changes: approvedChanges,
           export_naming: namingInput,
+          export_meta: exportMeta,
+          highlight_keywords: highlightKeywords,
         },
       })
 
@@ -189,21 +314,104 @@ async function analyzeJobDescription(
 async function generateFinalResume(
   masterResume: ResumeContent,
   jobDescription: string,
-  approvedChanges: ProposedResumeChange[],
-  analysis?: ResumeWorkflowAnalysis
+  approvedChanges: any[],
+  analysis?: any
 ): Promise<ResumeContent> {
-  const openrouterClient = createOpenRouterClient()
-  const { object } = await generateObject({
-    model: openrouterClient('openai/gpt-4o-mini'),
-    system: FINAL_RESUME_PROMPT,
-    prompt: [
-      `Master Resume JSON:\n${JSON.stringify(masterResume, null, 2)}`,
-      `Job Description:\n${jobDescription}`,
-      `Workflow Analysis:\n${JSON.stringify(analysis || {}, null, 2)}`,
-      `Approved Proposed Changes:\n${JSON.stringify(approvedChanges, null, 2)}`,
-    ].join('\n\n'),
-    schema: resumeContentSchema,
-  })
+  // 1. Deep clone the master resume content to guarantee 100% item retention
+  const finalResume: ResumeContent = JSON.parse(JSON.stringify(masterResume))
 
-  return object
+  // 2. Normalize and format bullet point headers to bold label format if needed
+  const formatBulletLabel = (bulletText: string): string => {
+    const trimmed = bulletText.trim()
+    // Check if the bullet starts with a header followed by a colon (e.g. "FEA Validation: Led structural...")
+    // and doesn't already contain the visual split separator " - "
+    const colonMatch = trimmed.match(/^([^:]+):\s+(.+)$/)
+    if (colonMatch && !trimmed.includes(" - ")) {
+      const header = colonMatch[1].trim()
+      const body = colonMatch[2].trim()
+      return `${header} - ${body}`
+    }
+    return trimmed
+  }
+
+  // Helper to format all summaries/descriptions in the cloned resume
+  if (finalResume.summary) {
+    finalResume.summary = finalResume.summary.split('\n').map(formatBulletLabel).join('\n')
+  }
+  
+  if (finalResume.experience) {
+    finalResume.experience.forEach(exp => {
+      if (exp.summary) {
+        exp.summary = exp.summary.split('\n').map(formatBulletLabel).join('\n')
+      }
+    })
+  }
+
+  if (finalResume.projects) {
+    finalResume.projects.forEach(proj => {
+      if (proj.description) {
+        proj.description = formatBulletLabel(proj.description)
+      }
+    })
+  }
+
+  // 3. Programmatically apply each approved proposed change
+  for (const change of approvedChanges) {
+    const section = change.section
+    const current = change.currentText.trim()
+    const proposed = formatBulletLabel(change.proposedText.trim())
+
+    if (section === 'summary') {
+      if (finalResume.summary && finalResume.summary.includes(current)) {
+        finalResume.summary = finalResume.summary.replace(current, proposed)
+      } else {
+        finalResume.summary = proposed
+      }
+    } else if (section === 'experience' && finalResume.experience) {
+      for (const exp of finalResume.experience) {
+        if (exp.summary) {
+          const lines = exp.summary.split('\n')
+          const index = lines.findIndex(line => {
+            const cleanLine = line.trim().replace(/^[-*•\s]+/, '')
+            const cleanCurrent = current.replace(/^[-*•\s]+/, '')
+            return cleanLine.includes(cleanCurrent) || cleanCurrent.includes(cleanLine)
+          })
+
+          if (index !== -1) {
+            const symbolMatch = lines[index].match(/^([-*•\s]+)/)
+            const symbol = symbolMatch ? symbolMatch[1] : ''
+            lines[index] = `${symbol}${proposed}`
+            exp.summary = lines.join('\n')
+            break
+          } else if (exp.summary.includes(current)) {
+            exp.summary = exp.summary.replace(current, proposed)
+            break
+          }
+        }
+      }
+    } else if (section === 'projects' && finalResume.projects) {
+      for (const proj of finalResume.projects) {
+        if (proj.description) {
+          if (proj.description.includes(current)) {
+            proj.description = proj.description.replace(current, proposed)
+            break
+          }
+        }
+      }
+    } else if (section === 'skills' && finalResume.skills) {
+      for (const skill of finalResume.skills) {
+        if (skill.name.toLowerCase() === current.toLowerCase()) {
+          skill.name = proposed
+          break
+        }
+        const kwIndex = skill.keywords.findIndex(kw => kw.toLowerCase() === current.toLowerCase())
+        if (kwIndex !== -1) {
+          skill.keywords[kwIndex] = proposed
+          break
+        }
+      }
+    }
+  }
+
+  return finalResume
 }

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { ProposedResumeChange, Resume, ResumeWorkflowAnalysis } from '@/lib/types'
+import { useEffect, useState } from 'react'
+import { CareerProfile, ProposedResumeChange, Resume, ResumeWorkflowAnalysis } from '@/lib/types'
 import { useSession } from '@/lib/session-context'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -9,20 +9,51 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { AlertCircle, CheckCircle2, Loader2, RotateCcw, Sparkles } from 'lucide-react'
+import { InteractiveProgress } from '@/components/interactive-progress'
 
 interface AIGeneratorProps {
   masterResume: Resume
+  profileId?: string
   onGenerateComplete?: (generatedResume: Resume) => void
 }
 
-export function AIGenerator({ masterResume, onGenerateComplete }: AIGeneratorProps) {
+export function AIGenerator({ masterResume, profileId: initialProfileId, onGenerateComplete }: AIGeneratorProps) {
   const { sessionId } = useSession()
   const [jobDescription, setJobDescription] = useState('')
+  const [profiles, setProfiles] = useState<CareerProfile[]>([])
+  const [selectedProfileId, setSelectedProfileId] = useState(initialProfileId || '')
   const [analysis, setAnalysis] = useState<ResumeWorkflowAnalysis | null>(null)
   const [approvedChangeIds, setApprovedChangeIds] = useState<Set<string>>(new Set())
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isAnalyzeCompleted, setIsAnalyzeCompleted] = useState(false)
+  const [isGenerateCompleted, setIsGenerateCompleted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!sessionId) return
+
+    const loadProfiles = async () => {
+      try {
+        const response = await fetch('/api/personas', {
+          headers: { 'x-session-id': sessionId },
+        })
+        if (response.ok) {
+          const data: CareerProfile[] = await response.json()
+          setProfiles(data)
+          if (initialProfileId) {
+            setSelectedProfileId(initialProfileId)
+          } else if (data.length > 0) {
+            setSelectedProfileId(data[0].id)
+          }
+        }
+      } catch (loadError) {
+        console.error('Error loading profiles:', loadError)
+      }
+    }
+
+    loadProfiles()
+  }, [sessionId, initialProfileId])
 
   const handleAnalyze = async () => {
     if (!sessionId || !jobDescription.trim()) {
@@ -31,6 +62,7 @@ export function AIGenerator({ masterResume, onGenerateComplete }: AIGeneratorPro
     }
 
     setIsAnalyzing(true)
+    setIsAnalyzeCompleted(false)
     setError(null)
 
     try {
@@ -58,8 +90,9 @@ export function AIGenerator({ masterResume, onGenerateComplete }: AIGeneratorPro
       const message = err instanceof Error ? err.message : 'Unknown error'
       setError(message)
       console.error('Error analyzing job description:', err)
+      setIsAnalyzeCompleted(true)
     } finally {
-      setIsAnalyzing(false)
+      setIsAnalyzeCompleted(true)
     }
   }
 
@@ -73,9 +106,11 @@ export function AIGenerator({ masterResume, onGenerateComplete }: AIGeneratorPro
     }
 
     setIsGenerating(true)
+    setIsGenerateCompleted(false)
     setError(null)
 
     try {
+      const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId)
       const response = await fetch('/api/generate-resume', {
         method: 'POST',
         headers: {
@@ -88,6 +123,8 @@ export function AIGenerator({ masterResume, onGenerateComplete }: AIGeneratorPro
           job_description: jobDescription,
           analysis,
           approved_changes: approvedChanges,
+          profile_id: selectedProfileId || null,
+          profile_name: selectedProfile?.name || null,
         }),
       })
 
@@ -101,8 +138,9 @@ export function AIGenerator({ masterResume, onGenerateComplete }: AIGeneratorPro
       const message = err instanceof Error ? err.message : 'Unknown error'
       setError(message)
       console.error('Error generating final resume:', err)
+      setIsGenerateCompleted(true)
     } finally {
-      setIsGenerating(false)
+      setIsGenerateCompleted(true)
     }
   }
 
@@ -134,7 +172,26 @@ export function AIGenerator({ masterResume, onGenerateComplete }: AIGeneratorPro
   }
 
   return (
-    <Card>
+    <>
+      {isAnalyzing && (
+        <InteractiveProgress
+          title="Analyzing Job Description"
+          subtitle="AI is scanning JD parameters, extracting domain keywords, and identifying gaps"
+          isCompleted={isAnalyzeCompleted}
+          onClose={() => setIsAnalyzing(false)}
+          estimatedDurationMs={9000}
+        />
+      )}
+      {isGenerating && (
+        <InteractiveProgress
+          title="Synthesizing Tailored Resume"
+          subtitle="AI is assembling approved modifications and building print-perfect layout structures"
+          isCompleted={isGenerateCompleted}
+          onClose={() => setIsGenerating(false)}
+          estimatedDurationMs={7000}
+        />
+      )}
+      <Card>
       <CardHeader>
         <CardTitle>AI Resume Tailor</CardTitle>
         <CardDescription>
@@ -146,6 +203,23 @@ export function AIGenerator({ masterResume, onGenerateComplete }: AIGeneratorPro
 
         {!analysis ? (
           <div className="space-y-4">
+            {profiles.length > 0 && (
+              <div>
+                <label className="text-sm font-medium">Career profile</label>
+                <select
+                  value={selectedProfileId}
+                  onChange={(event) => setSelectedProfileId(event.target.value)}
+                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                  disabled={isAnalyzing}
+                >
+                  {profiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium">Job Description</label>
               <Textarea
@@ -218,6 +292,7 @@ export function AIGenerator({ masterResume, onGenerateComplete }: AIGeneratorPro
         )}
       </CardContent>
     </Card>
+    </>
   )
 }
 

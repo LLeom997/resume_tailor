@@ -77,11 +77,9 @@ export default function EditResumePage() {
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto py-8 px-4 max-w-7xl">
         <div className="mb-8 flex items-center gap-4">
-          <Link href="/dashboard">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{pageTitle}</h1>
             <p className="text-sm text-zinc-500 mt-1">

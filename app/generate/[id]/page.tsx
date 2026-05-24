@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { useSession } from '@/lib/session-context'
 import { Resume } from '@/lib/types'
 import { AIGenerator } from '@/components/ai-generator'
@@ -12,7 +12,9 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
 export default function GeneratePage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const { sessionId, isLoading } = useSession()
+  const profileId = searchParams.get('profile_id') || undefined
   const [masterResume, setMasterResume] = useState<Resume | null>(null)
   const [isLoadingResume, setIsLoadingResume] = useState(true)
 
@@ -72,17 +74,16 @@ export default function GeneratePage() {
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto py-8 px-4">
         <div className="mb-8 flex items-center gap-4">
-          <Link href="/dashboard">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
           <h1 className="text-3xl font-bold text-gray-900">Generate Tailored Resume</h1>
         </div>
 
         <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6">
           <AIGenerator
             masterResume={masterResume}
+            profileId={profileId}
             onGenerateComplete={handleGenerateComplete}
           />
         </div>

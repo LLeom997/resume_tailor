@@ -2,12 +2,14 @@
 
 import { ResumeContent } from '@/lib/types'
 import { formatDate } from '@/lib/resume-utils'
+import { HighlightedText } from '@/components/highlighted-text'
 import { Award, BriefcaseBusiness, GraduationCap, Languages, Lightbulb, LucideIcon, Wrench } from 'lucide-react'
 import { ReactNode } from 'react'
 
 interface ResumePreviewProps {
   content: ResumeContent
   template?: 'classic' | 'modern'
+  highlightKeywords?: string[]
 }
 
 const sectionIds = {
@@ -19,25 +21,51 @@ const sectionIds = {
   experience: 'experience',
 }
 
-export function ResumePreview({ content, template = 'classic' }: ResumePreviewProps) {
-  return <TwoColumnTemplate content={content} enhanced={template === 'modern'} />
+export function ResumePreview({ content, template = 'classic', highlightKeywords = [] }: ResumePreviewProps) {
+  return (
+    <TwoColumnTemplate
+      content={content}
+      enhanced={template === 'modern'}
+      highlightKeywords={highlightKeywords}
+    />
+  )
 }
 
-function TwoColumnTemplate({ content, enhanced }: { content: ResumeContent; enhanced: boolean }) {
-  const sheetClass = enhanced ? 'resume-sheet resume-sheet--enhanced' : 'resume-sheet'
+function TwoColumnTemplate({
+  content,
+  enhanced,
+  highlightKeywords,
+}: {
+  content: ResumeContent
+  enhanced: boolean
+  highlightKeywords: string[]
+}) {
+  const sheetClass = [
+    'resume-sheet',
+    enhanced ? 'resume-sheet--enhanced' : '',
+    highlightKeywords.length > 0 ? 'resume-sheet--highlighted' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const hl = (text: string, className?: string) => (
+    <HighlightedText text={text} keywords={highlightKeywords} className={className} />
+  )
 
   return (
     <article id="resume-document" className={sheetClass}>
       <header className="resume-header">
-        <h1 className="resume-name">{content.basics.name}</h1>
-        <div className="resume-contact">
-          {content.basics.email && <span>Email: {content.basics.email}</span>}
-          {content.basics.phone && <span>Phone: {content.basics.phone}</span>}
-          {content.basics.location && <span>{content.basics.location}</span>}
-          {content.basics.website && <span>{content.basics.website}</span>}
+        <div className="resume-header-top">
+          <h1 className="resume-name">{content.basics.name}</h1>
+          <div className="resume-contact-stack">
+            {content.basics.email && <div className="resume-contact-item">Email: {content.basics.email}</div>}
+            {content.basics.phone && <div className="resume-contact-item">Phone: {content.basics.phone}</div>}
+            {content.basics.location && <div className="resume-contact-item">{content.basics.location}</div>}
+            {content.basics.website && <div className="resume-contact-item">{content.basics.website}</div>}
+          </div>
         </div>
-        <p className="resume-headline">{content.basics.headline}</p>
-        {content.summary && <p className="resume-summary">{content.summary}</p>}
+        <p className="resume-headline">{hl(content.basics.headline)}</p>
+        {content.summary && <p className="resume-summary">{hl(content.summary)}</p>}
       </header>
 
       <div className="resume-columns">
@@ -47,9 +75,9 @@ function TwoColumnTemplate({ content, enhanced }: { content: ResumeContent; enha
               <div className="resume-stack-sm">
                 {content.skills.map((skill) => (
                   <div key={skill.id}>
-                    <p className="resume-accent">{skill.name}:</p>
+                    <p className="resume-accent">{hl(skill.name)}:</p>
                     <p className="resume-muted" style={{ marginTop: '2px' }}>
-                      {skill.keywords.join(', ')}
+                      {hl(skill.keywords.join(', '))}
                     </p>
                   </div>
                 ))}
@@ -63,7 +91,7 @@ function TwoColumnTemplate({ content, enhanced }: { content: ResumeContent; enha
                 {content.projects.map((project) => (
                   <div key={project.id}>
                     <p className="resume-bold">
-                      {project.name}
+                      {hl(project.name)}
                       {(project.startDate || project.endDate) && (
                         <span className="resume-muted-light" style={{ fontWeight: 400 }}>
                           {' '}
@@ -72,7 +100,7 @@ function TwoColumnTemplate({ content, enhanced }: { content: ResumeContent; enha
                       )}
                     </p>
                     <p className="resume-muted" style={{ marginTop: '2px' }}>
-                      {project.description}
+                      {hl(project.description)}
                     </p>
                   </div>
                 ))}
@@ -86,12 +114,12 @@ function TwoColumnTemplate({ content, enhanced }: { content: ResumeContent; enha
                 {content.education.map((education) => (
                   <div key={education.id}>
                     <p className="resume-bold">
-                      {education.studyType} in {education.area}
+                      {hl(`${education.studyType} in ${education.area}`)}
                     </p>
                     <p className="resume-muted">
                       {formatDate(education.startDate)}-{formatDate(education.endDate)}
                     </p>
-                    <p className="resume-muted">{education.institution}</p>
+                    <p className="resume-muted">{hl(education.institution)}</p>
                   </div>
                 ))}
               </div>
@@ -103,7 +131,7 @@ function TwoColumnTemplate({ content, enhanced }: { content: ResumeContent; enha
               <div className="resume-stack-sm">
                 {content.certifications.map((certification) => (
                   <p key={certification.id} className="resume-muted">
-                    {certification.name}
+                    {hl(certification.name)}
                   </p>
                 ))}
               </div>
@@ -125,13 +153,17 @@ function TwoColumnTemplate({ content, enhanced }: { content: ResumeContent; enha
                   <div key={experience.id} className="resume-experience-item">
                     <div className="resume-experience-header">
                       <p className="resume-experience-title">
-                        {experience.company} | {experience.position}
+                        {hl(`${experience.company} | ${experience.position}`)}
                       </p>
                       <p className="resume-experience-dates">
                         {formatDate(experience.startDate)} - {formatDate(experience.endDate)}
                       </p>
                     </div>
-                    <ExperienceSummary summary={experience.summary} enhanced={enhanced} />
+                    <ExperienceSummary
+                      summary={experience.summary}
+                      enhanced={enhanced}
+                      highlightKeywords={highlightKeywords}
+                    />
                   </div>
                 ))}
               </div>
@@ -167,7 +199,15 @@ function ResumeSection({
   )
 }
 
-function ExperienceSummary({ summary, enhanced }: { summary: string; enhanced: boolean }) {
+function ExperienceSummary({
+  summary,
+  enhanced,
+  highlightKeywords,
+}: {
+  summary: string
+  enhanced: boolean
+  highlightKeywords: string[]
+}) {
   const entries = summary.split(/\n{2,}/).filter(Boolean)
 
   return (
@@ -180,11 +220,13 @@ function ExperienceSummary({ summary, enhanced }: { summary: string; enhanced: b
           <p key={`${entry}-${index}`} className="resume-experience-line">
             {body ? (
               <>
-                <span className="resume-experience-label">{label} - </span>
-                {body}
+                <span className="resume-experience-label">
+                  <HighlightedText text={`${label} - `} keywords={highlightKeywords} />
+                </span>
+                <HighlightedText text={body} keywords={highlightKeywords} />
               </>
             ) : (
-              entry
+              <HighlightedText text={entry} keywords={highlightKeywords} />
             )}
           </p>
         )

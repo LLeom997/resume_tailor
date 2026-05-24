@@ -13,7 +13,8 @@ export function calculateResumeScale(element: HTMLElement): number {
   if (contentHeight <= RESUME_SHEET_HEIGHT_PX) {
     return 1
   }
-  return RESUME_SHEET_HEIGHT_PX / contentHeight
+  // Apply a 0.98 safety buffer to ensure margins and text are kept slightly away from the exact A4 page edge
+  return (RESUME_SHEET_HEIGHT_PX / contentHeight) * 0.98
 }
 
 /**

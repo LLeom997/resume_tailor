@@ -1,12 +1,12 @@
 /**
- * Shared resume export naming: Company_Role_May2026 (.pdf for downloads).
- * Uses double-underscore delimiters so company/role may contain single underscores.
+ * Resume export naming: Company_Mechanical_Design_Engineer_May2026.pdf
  */
 
 export interface ResumeExportNameInput {
   company: string
   role: string
   date?: Date
+  monthYear?: string
 }
 
 export interface ParsedResumeExportName {
@@ -39,12 +39,13 @@ export function buildMonthYearSuffix(date: Date = new Date()): string {
 
 /**
  * Builds the base export name without file extension.
+ * Example: Company_Mechanical_Design_Engineer_May2026
  */
 export function buildResumeExportBaseName(input: ResumeExportNameInput): string {
   const company = sanitizeFilePart(input.company.trim() || "Company")
   const role = sanitizeFilePart(input.role.trim() || "Role")
-  const monthYear = buildMonthYearSuffix(input.date)
-  return `${company}__${role}__${monthYear}`
+  const monthYear = input.monthYear || buildMonthYearSuffix(input.date)
+  return `${company}_${role}_${monthYear}`
 }
 
 /**
@@ -56,19 +57,39 @@ export function buildResumeExportFileName(input: ResumeExportNameInput): string 
 
 /**
  * Parses a stored variant name back into company, role, and month-year.
+ * Supports legacy double-underscore names.
  */
 export function parseResumeExportBaseName(name: string): ParsedResumeExportName | null {
   const withoutExtension = name.replace(/\.pdf$/i, "")
-  const parts = withoutExtension.split("__")
 
-  if (parts.length !== 3 || !parts[2]) {
+  if (withoutExtension.includes("__")) {
+    const legacyParts = withoutExtension.split("__")
+    if (legacyParts.length === 3 && legacyParts[2]) {
+      return {
+        company: legacyParts[0].replace(/_/g, " "),
+        role: legacyParts[1].replace(/_/g, " "),
+        monthYear: legacyParts[2],
+      }
+    }
+  }
+
+  const monthYearMatch = withoutExtension.match(/_([A-Za-z]{3}\d{4})$/)
+  if (!monthYearMatch) {
+    return null
+  }
+
+  const monthYear = monthYearMatch[1]
+  const prefix = withoutExtension.slice(0, -monthYearMatch[0].length)
+  const segments = prefix.split("_").filter(Boolean)
+
+  if (segments.length < 2) {
     return null
   }
 
   return {
-    company: parts[0].replace(/_/g, " "),
-    role: parts[1].replace(/_/g, " "),
-    monthYear: parts[2],
+    company: segments[0].replace(/_/g, " "),
+    role: segments.slice(1).join(" ").replace(/_/g, " "),
+    monthYear,
   }
 }
 

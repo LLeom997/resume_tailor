@@ -11,6 +11,7 @@ import { defaultResumeContent } from "@/lib/resume-utils"
 import { newResumeItemId } from "@/lib/resume-id"
 import { resumeContentSchema } from "@/lib/resume-ai-schemas"
 import { Plus, Trash2, Upload } from "lucide-react"
+import { InteractiveProgress } from "@/components/interactive-progress"
 
 interface ResumeEditorProps {
   resume?: Resume
@@ -34,6 +35,7 @@ export function ResumeEditor({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isParsing, setIsParsing] = useState(false)
+  const [isParseCompleted, setIsParseCompleted] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [pasteText, setPasteText] = useState("")
   const [content, setContent] = useState<ResumeContent>(resume?.content || initialContent || defaultResumeContent)
@@ -107,6 +109,7 @@ export function ResumeEditor({
     }
 
     setIsParsing(true)
+    setIsParseCompleted(false)
     setUploadError(null)
     try {
       const response = await fetch("/api/parse-resume", {
@@ -126,8 +129,9 @@ export function ResumeEditor({
       applyParsedContent(resumeContentSchema.parse(data.content))
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "Failed to parse resume")
+      setIsParseCompleted(true) // Complete and close even on error
     } finally {
-      setIsParsing(false)
+      setIsParseCompleted(true)
     }
   }
 
@@ -166,6 +170,15 @@ export function ResumeEditor({
 
   return (
     <div className="space-y-6">
+      {isParsing && (
+        <InteractiveProgress 
+          title="Parsing Resume Layout" 
+          subtitle="AI is segmenting text layers and populating editor fields" 
+          isCompleted={isParseCompleted}
+          onClose={() => setIsParsing(false)}
+          estimatedDurationMs={6000}
+        />
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Import resume</CardTitle>

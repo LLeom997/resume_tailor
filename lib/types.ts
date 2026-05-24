@@ -46,12 +46,34 @@ export interface ResumeContent {
   languages: string[]
 }
 
+export interface ResumeExportMeta {
+  company: string
+  role: string
+  monthYear: string
+  keywords: string[]
+  profile_id?: string | null
+  profile_name?: string | null
+}
+
+export interface CareerProfile {
+  id: string
+  session_id: string
+  name: string
+  slug: string
+  description: string | null
+  master_resume_id: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Resume {
   id: string
   session_id: string
   name: string
   content: ResumeContent
   is_master: boolean
+  profile_id?: string | null
+  export_meta?: ResumeExportMeta | null
   created_at: string
   updated_at: string
 }
