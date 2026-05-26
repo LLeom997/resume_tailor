@@ -19,10 +19,7 @@ Rules:
  */
 export async function POST(request: NextRequest) {
   try {
-    const sessionId = request.headers.get("x-session-id")
-    if (!sessionId) {
-      return NextResponse.json({ error: "Session ID required" }, { status: 400 })
-    }
+    const sessionId = "default-workspace-session"
 
     const body = await request.json()
     const rawText = typeof body.rawText === "string" ? body.rawText.trim() : ""

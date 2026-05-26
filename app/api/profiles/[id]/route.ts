@@ -7,10 +7,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const sessionId = request.headers.get("x-session-id")
-    if (!sessionId) {
-      return NextResponse.json({ error: "Session ID required" }, { status: 400 })
-    }
+    const sessionId = "default-workspace-session"
 
     const supabase = await createClient()
 
@@ -67,10 +64,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const sessionId = request.headers.get("x-session-id")
-    if (!sessionId) {
-      return NextResponse.json({ error: "Session ID required" }, { status: 400 })
-    }
+    const sessionId = "default-workspace-session"
 
     const body = await request.json()
     const supabase = await createClient()

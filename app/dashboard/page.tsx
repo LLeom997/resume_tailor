@@ -173,8 +173,7 @@ export default function DashboardPage() {
               className="text-xs gap-1.5 shadow-sm border-zinc-200 text-zinc-650 hover:bg-zinc-50"
               onClick={() => {
                 if (typeof window !== 'undefined') {
-                  const url = new URL(window.location.href)
-                  url.search = `?session=${sessionId || ''}`
+                  const url = new URL(window.location.origin + window.location.pathname)
                   navigator.clipboard.writeText(url.toString())
                   setCopiedSync(true)
                   setTimeout(() => setCopiedSync(false), 2000)
@@ -182,7 +181,7 @@ export default function DashboardPage() {
               }}
             >
               <Share2 className="w-3.5 h-3.5 text-zinc-500" />
-              {copiedSync ? 'Sync URL Copied!' : 'Sync to Vercel'}
+              {copiedSync ? 'Workspace Link Copied!' : 'Share Workspace'}
             </Button>
             {masterResume && (
               <Link href={`/preview/${masterResume.id}`}>
@@ -420,73 +419,20 @@ export default function DashboardPage() {
               })}
             </Card>
 
-            {/* SESSION ID MANAGER */}
+            {/* SESSION STATUS / GLOBAL SYNC */}
             <div>
-              <h2 className="text-lg font-bold tracking-tight text-zinc-800">Session Workspace Sync</h2>
-              <p className="text-xs text-zinc-500 mt-0.5">Recover resumes & personas from old sessions</p>
+              <h2 className="text-lg font-bold tracking-tight text-zinc-800">Workspace Status</h2>
+              <p className="text-xs text-zinc-500 mt-0.5">Open & globally synchronized environment</p>
             </div>
 
-            <Card className="shadow-sm border-zinc-200 p-4 space-y-4">
-              <div className="space-y-1.5 text-xs">
-                <span className="text-zinc-500 font-bold uppercase tracking-wider text-[9px]">Active Session ID</span>
-                <div className="flex gap-2 items-center">
-                  <input
-                    readOnly
-                    value={sessionId || ''}
-                    className="flex-1 bg-zinc-50 text-[10px] px-2 py-1.5 font-mono border border-zinc-200 rounded text-zinc-600 focus:outline-none select-all animate-in fade-in"
-                  />
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    className="h-8 text-[10px] font-semibold flex-shrink-0 cursor-pointer"
-                    onClick={() => {
-                      if (sessionId) {
-                        navigator.clipboard.writeText(sessionId)
-                        setCopiedSession(true)
-                        setTimeout(() => setCopiedSession(false), 2000)
-                      }
-                    }}
-                  >
-                    {copiedSession ? 'Copied!' : 'Copy'}
-                  </Button>
-                </div>
+            <Card className="shadow-sm border-zinc-200 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-200 p-2.5 rounded-md">
+                <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600 flex-shrink-0" />
+                <span className="text-xs font-semibold">Active & Shared Globally</span>
               </div>
-
-              <div className="space-y-1.5 text-xs border-t border-zinc-100 pt-3">
-                <span className="text-zinc-650 font-bold">Merge Historical Session</span>
-                <p className="text-[10px] text-zinc-400 leading-normal">
-                  Paste the session ID from your old browser or device to migrate all resumes and personas into your current workspace.
-                </p>
-                <div className="space-y-2 mt-2">
-                  <Input
-                    placeholder="Enter old session ID (UUID)..."
-                    value={oldSessionId}
-                    onChange={(e) => {
-                      setOldSessionId(e.target.value)
-                      setMergeError(null)
-                    }}
-                    className="h-8 text-xs font-mono"
-                  />
-                  {mergeError && (
-                    <p className="text-[10px] text-red-650 leading-normal bg-red-50 p-1.5 rounded border border-red-200">
-                      ⚠️ {mergeError}
-                    </p>
-                  )}
-                  {mergeSuccess && (
-                    <p className="text-[10px] text-emerald-800 leading-normal bg-emerald-50 p-1.5 rounded border border-emerald-200">
-                      ✓ Workspace merged successfully! Reloading...
-                    </p>
-                  )}
-                  <Button
-                    size="sm"
-                    className="w-full bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] h-8 font-semibold shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
-                    onClick={handleMergeSession}
-                    disabled={isMergingSession || !oldSessionId.trim()}
-                  >
-                    {isMergingSession ? 'Merging Workspace...' : 'Merge Historical Session'}
-                  </Button>
-                </div>
-              </div>
+              <p className="text-[11px] text-zinc-500 leading-relaxed">
+                Your workspace runs in <strong>Open Access Mode</strong>. Any browser opening this URL will automatically see, edit, and tailor these personas and resumes openly without requiring session IDs.
+              </p>
             </Card>
           </div>
         </div>

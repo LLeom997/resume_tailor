@@ -3,10 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const currentSessionId = request.headers.get('x-session-id')
-    if (!currentSessionId) {
-      return NextResponse.json({ error: 'Session ID required' }, { status: 400 })
-    }
+    const currentSessionId = "default-workspace-session"
 
     const { oldSessionId } = await request.json()
 

@@ -8,10 +8,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const sessionId = request.headers.get("x-session-id")
-    if (!sessionId) {
-      return NextResponse.json({ error: "Session ID required" }, { status: 400 })
-    }
+    const sessionId = "default-workspace-session"
 
     const supabase = await createClient()
     const { error } = await supabase

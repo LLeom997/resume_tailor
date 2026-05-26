@@ -5,13 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 // GET all resumes for the session
 export async function GET(request: NextRequest) {
   try {
-    const sessionId = request.headers.get('x-session-id')
-    if (!sessionId) {
-      return NextResponse.json(
-        { error: 'Session ID required' },
-        { status: 400 }
-      )
-    }
+    const sessionId = "default-workspace-session"
 
     const supabase = await createClient()
 
@@ -39,13 +33,7 @@ export async function GET(request: NextRequest) {
 // POST create a new resume
 export async function POST(request: NextRequest) {
   try {
-    const sessionId = request.headers.get('x-session-id')
-    if (!sessionId) {
-      return NextResponse.json(
-        { error: 'Session ID required' },
-        { status: 400 }
-      )
-    }
+    const sessionId = "default-workspace-session"
 
     const { name, content, is_master } = await request.json()
 

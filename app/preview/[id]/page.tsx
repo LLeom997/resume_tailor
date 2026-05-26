@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import Link from 'next/link'
 import { ArrowLeft, Download, Loader2, Printer, ChevronDown, ChevronUp, History, Settings, Sparkles, Send, Check, Undo2 } from 'lucide-react'
 import { exportResumePdf } from '@/lib/export-resume-pdf'
+import { toast } from '@/components/ui/use-toast'
 import { applyResumeScale, clearResumeScale } from '@/lib/resume-export-scale'
 import {
   buildResumeExportBaseName,
@@ -40,14 +41,14 @@ export default function PreviewPage() {
 
   const [activeTab, setActiveTab] = useState<'edit' | 'ai' | 'history'>('edit')
   const [historyList, setHistoryList] = useState<any[]>([])
-  
+
   // Basic states for editing sections
   const [editedBasics, setEditedBasics] = useState<any>(null)
   const [editedSummary, setEditedSummary] = useState("")
   const [editedSkills, setEditedSkills] = useState<any[]>([])
   const [editedExperience, setEditedExperience] = useState<any[]>([])
   const [editedProjects, setEditedProjects] = useState<any[]>([])
-  
+
   // AI Co-Pilot states
   const [aiTarget, setAiTarget] = useState<string>('summary')
   const [aiPrompt, setAiPrompt] = useState<string>('')
@@ -141,7 +142,7 @@ export default function PreviewPage() {
 
   const saveSectionChanges = async (sectionName: string, updatedContent: any, description: string) => {
     if (!sessionId || !resume) return
-    
+
     // Construct the new full resume content
     const newContent = {
       ...resume.content,
@@ -169,7 +170,7 @@ export default function PreviewPage() {
       }
 
       const updatedResume = await resumeRes.json()
-      
+
       // 2. Save history entry to database
       await fetch(`/api/resumes/${resume.id}/history`, {
         method: 'POST',
@@ -402,7 +403,7 @@ export default function PreviewPage() {
 
   const saveKeywordsToDb = async (updatedKeywords: string[]) => {
     if (!sessionId || !resume) return
-    
+
     const currentMeta = resume.export_meta || {}
     const updatedMeta = {
       ...currentMeta,
@@ -594,8 +595,8 @@ export default function PreviewPage() {
                 />
               </div>
               <div className="flex items-center gap-3">
-                <Button 
-                  onClick={saveVariantName} 
+                <Button
+                  onClick={saveVariantName}
                   disabled={saveStatus === 'saving'}
                   variant="secondary"
                   size="sm"
@@ -665,7 +666,7 @@ export default function PreviewPage() {
               />
             </div>
           </div>
-          
+
           {/* Live Section Editor & Change History Sidebar on the right */}
           <div className="space-y-6 print:hidden">
             <Card className="shadow-sm border-zinc-200 bg-white">
@@ -677,31 +678,28 @@ export default function PreviewPage() {
                 <div className="flex bg-zinc-100 p-0.5 rounded-md border border-zinc-200">
                   <button
                     onClick={() => setActiveTab('edit')}
-                    className={`text-xs px-2 py-1 rounded-sm font-medium transition-all cursor-pointer ${
-                      activeTab === 'edit'
+                    className={`text-xs px-2 py-1 rounded-sm font-medium transition-all cursor-pointer ${activeTab === 'edit'
                         ? 'bg-white shadow-xs text-zinc-900 font-semibold border border-zinc-150'
                         : 'text-zinc-500 hover:text-zinc-850'
-                    }`}
+                      }`}
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => setActiveTab('ai')}
-                    className={`text-xs px-2 py-1 rounded-sm font-medium transition-all flex items-center gap-1 cursor-pointer ${
-                      activeTab === 'ai'
+                    className={`text-xs px-2 py-1 rounded-sm font-medium transition-all flex items-center gap-1 cursor-pointer ${activeTab === 'ai'
                         ? 'bg-white shadow-xs text-zinc-900 font-semibold border border-zinc-150'
                         : 'text-zinc-500 hover:text-zinc-850'
-                    }`}
+                      }`}
                   >
                     <Sparkles className="w-3 h-3 text-blue-500 animate-pulse" /> AI Assist
                   </button>
                   <button
                     onClick={() => setActiveTab('history')}
-                    className={`text-xs px-2 py-1 rounded-sm font-medium transition-all cursor-pointer ${
-                      activeTab === 'history'
+                    className={`text-xs px-2 py-1 rounded-sm font-medium transition-all cursor-pointer ${activeTab === 'history'
                         ? 'bg-white shadow-xs text-zinc-900 font-semibold border border-zinc-150'
                         : 'text-zinc-500 hover:text-zinc-850'
-                    }`}
+                      }`}
                   >
                     History ({historyList.length})
                   </button>
@@ -720,7 +718,7 @@ export default function PreviewPage() {
                         <span>Personal Details</span>
                         {expandedSection === 'basics' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                       </button>
-                      
+
                       {expandedSection === 'basics' && editedBasics && (
                         <div className="p-3 space-y-2 text-[11px] bg-white">
                           <div className="space-y-1">
@@ -773,7 +771,7 @@ export default function PreviewPage() {
                         <span>Professional Summary</span>
                         {expandedSection === 'summary' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                       </button>
-                      
+
                       {expandedSection === 'summary' && (
                         <div className="p-3 space-y-2 text-[11px] bg-white">
                           <div className="space-y-1">
@@ -812,7 +810,7 @@ export default function PreviewPage() {
                         <span>Work Experience Bullets</span>
                         {expandedSection === 'experience' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                       </button>
-                      
+
                       {expandedSection === 'experience' && (
                         <div className="p-3 space-y-3 text-[11px] bg-white font-sans">
                           {editedExperience.map((exp) => (
@@ -853,7 +851,7 @@ export default function PreviewPage() {
                         <span>Technical Proficiency Groups</span>
                         {expandedSection === 'skills' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                       </button>
-                      
+
                       {expandedSection === 'skills' && (
                         <div className="p-3 space-y-3 text-[11px] bg-white font-sans">
                           {editedSkills.map((skill, index) => (
@@ -884,7 +882,7 @@ export default function PreviewPage() {
                         <span>Projects</span>
                         {expandedSection === 'projects' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                       </button>
-                      
+
                       {expandedSection === 'projects' && (
                         <div className="p-3 space-y-3 text-[11px] bg-white font-sans">
                           {editedProjects.map((proj) => (
@@ -1113,14 +1111,12 @@ export default function PreviewPage() {
                     <span className="font-semibold text-zinc-700">Highlight matched terms in preview</span>
                     <button
                       onClick={() => setIsKeywordHighlightActive(!isKeywordHighlightActive)}
-                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        isKeywordHighlightActive ? 'bg-blue-600' : 'bg-zinc-250'
-                      }`}
+                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isKeywordHighlightActive ? 'bg-blue-600' : 'bg-zinc-250'
+                        }`}
                     >
                       <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                          isKeywordHighlightActive ? 'translate-x-4' : 'translate-x-0'
-                        }`}
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${isKeywordHighlightActive ? 'translate-x-4' : 'translate-x-0'
+                          }`}
                       />
                     </button>
                   </div>

@@ -15,29 +15,44 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check query parameters first
+    const defaultSessionId = 'default-workspace-session'
+
+    // Extract from query parameters or localStorage if present
     const params = new URLSearchParams(window.location.search)
     const urlSessionId = params.get('session') || params.get('sessionId')
+    const storedSessionId = localStorage.getItem('resumeBuilderSessionId')
 
-    if (urlSessionId) {
-      localStorage.setItem('resumeBuilderSessionId', urlSessionId)
-      setSessionId(urlSessionId)
+    const oldSessionId = urlSessionId || (storedSessionId && storedSessionId !== defaultSessionId ? storedSessionId : null)
 
-      // Clean up URL parameter cleanly without page reload
-      const cleanUrl = window.location.pathname + window.location.search.replace(/[?&]session(Id)?=[^&]*/gi, '')
-      window.history.replaceState({}, '', cleanUrl === '' ? '/' : cleanUrl)
+    if (oldSessionId && oldSessionId !== defaultSessionId) {
+      // Auto-migrate the old session database records to the new default workspace session!
+      fetch('/api/merge-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-id': defaultSessionId
+        },
+        body: JSON.stringify({ oldSessionId })
+      })
+      .then(res => res.json())
+      .then(data => {
+        console.log('Auto-migration result:', data)
+        localStorage.setItem('resumeBuilderSessionId', defaultSessionId)
+        
+        // Clean URL parameters cleanly without page reload
+        const cleanUrl = window.location.pathname + window.location.search.replace(/[?&]session(Id)?=[^&]*/gi, '')
+        window.history.replaceState({}, '', cleanUrl === '' ? '/' : cleanUrl)
+        
+        window.location.reload()
+      })
+      .catch(err => {
+        console.error('Auto-migration failed:', err)
+      })
     } else {
-      // Check localStorage for existing session
-      const storedSessionId = localStorage.getItem('resumeBuilderSessionId')
-      if (storedSessionId) {
-        setSessionId(storedSessionId)
-      } else {
-        // Generate new session ID
-        const newSessionId = generateSessionId()
-        localStorage.setItem('resumeBuilderSessionId', newSessionId)
-        setSessionId(newSessionId)
-      }
+      localStorage.setItem('resumeBuilderSessionId', defaultSessionId)
     }
+
+    setSessionId(defaultSessionId)
     setIsLoading(false)
   }, [])
 

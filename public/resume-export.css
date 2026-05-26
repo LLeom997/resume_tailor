@@ -98,7 +98,7 @@
 
 #resume-document .resume-columns {
   display: grid;
-  grid-template-columns: minmax(0, 290px) minmax(0, 1fr);
+  grid-template-columns: 290px 1fr;
   column-gap: 18px;
   align-items: start;
   width: 100%;
@@ -288,20 +288,21 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 15mm 15mm 15mm 15mm;
-    /* Clean standardized printable margins */
+    margin: 0;
   }
 
   html,
   body {
-    width: auto !important;
-    height: auto !important;
+    width: 794px !important;
+    height: 1123px !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
     font-family: "Google Sans Text", "Google Sans", Arial, sans-serif;
     font-size: 11px;
-    line-height: 1.4 !important;
+    line-height: 1.25 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   body * {
@@ -314,12 +315,14 @@
   }
 
   #resume-print-root {
-    position: static !important;
-    width: 100% !important;
-    height: auto !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 794px !important;
+    height: 1123px !important;
     margin: 0 !important;
     padding: 0 !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     background: #ffffff !important;
   }
 
@@ -329,71 +332,37 @@
   }
 
   #resume-document.resume-sheet {
-    box-sizing: border-box;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-height: 0 !important;
-    transform: none !important;
-    /* Disable scale to let browser handle vector fonts cleanly */
+    box-sizing: border-box !important;
+    width: 794px !important;
+    max-width: 794px !important;
+    min-height: 1123px !important;
+    height: 1123px !important;
+    transform: scale(var(--resume-scale, 1)) !important;
+    transform-origin: top left !important;
     margin: 0 !important;
-    padding: 0 !important;
-    font-size: 11px !important;
-    line-height: 1.4 !important;
-    color: #18181b !important;
+    padding: 32px 36px !important;
     background: #ffffff !important;
     box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
-  /* Single Column ATS-Safe Layout */
+  /* Retain all column structures exactly as seen in preview using robust fixed column sizes */
   #resume-document .resume-columns {
-    display: flex !important;
-    flex-direction: column !important;
-    width: 100% !important;
-    gap: 20px !important;
-    margin-top: 16px !important;
-  }
-
-  /* Experience main column rendered first for logical reading flow */
-  #resume-document .resume-main {
-    order: 1 !important;
-    width: 100% !important;
-  }
-
-  /* Sidebar blocks (Skills, Projects, Education, etc.) stacked second */
-  #resume-document .resume-sidebar {
-    order: 2 !important;
-    width: 100% !important;
-    border-top: 1px solid #e4e4e7 !important;
-    /* Zinc separator */
-    padding-top: 16px !important;
-    border-right: none !important;
-    /* Remove columns borderline */
+    display: grid !important;
+    grid-template-columns: 290px 1fr !important;
+    column-gap: 18px !important;
   }
 
   #resume-document.resume-sheet--enhanced .resume-sidebar {
-    border-right: none !important;
+    border-right: 1px solid #e0f2fe !important;
   }
 
-  #resume-document .resume-section {
-    margin-bottom: 20px !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  #resume-document .resume-experience-item {
-    margin-bottom: 14px !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  /* ATS clean printing without visual colors */
+  /* Highlighting and colors maintained exactly as customized in the editor */
   #resume-document .resume-highlight-keyword,
-  #resume-document .resume-highlight-kpi,
-  #resume-document.resume-sheet--enhanced .resume-highlight-keyword,
-  #resume-document.resume-sheet--enhanced .resume-highlight-kpi {
+  #resume-document .resume-highlight-kpi {
     background-color: transparent !important;
     color: inherit !important;
-    padding: 0 !important;
     font-weight: 700 !important;
   }
 }
