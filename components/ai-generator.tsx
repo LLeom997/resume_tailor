@@ -31,6 +31,14 @@ export function AIGenerator({ masterResume, profileId: initialProfileId, onGener
   const [isGenerateCompleted, setIsGenerateCompleted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
+  // Model Selector state
+  const [modelType, setModelType] = useState('openai/gpt-4o-mini')
+  const [customModel, setCustomModel] = useState('')
+  const activeModel = modelType === 'custom' ? customModel : modelType
+
+  // Performance stats state
+  const [performance, setPerformance] = useState<any>(null)
+  
   const store = useWorkspaceStore()
   const activeTask = store.activeTask
 
@@ -47,6 +55,9 @@ export function AIGenerator({ masterResume, profileId: initialProfileId, onGener
           setAnalysis(activeTask.metadata.analysis)
           if (activeTask.metadata.jobDescription) {
             setJobDescription(activeTask.metadata.jobDescription)
+          }
+          if (activeTask.metadata.performance) {
+            setPerformance(activeTask.metadata.performance)
           }
           setApprovedChangeIds(new Set(activeTask.metadata.analysis.proposedChanges.map((c: any) => c.id)))
         }
@@ -101,11 +112,15 @@ export function AIGenerator({ masterResume, profileId: initialProfileId, onGener
       setError('Please enter a job description')
       return
     }
+    if (modelType === 'custom' && !customModel.trim()) {
+      setError('Please enter a custom model name')
+      return
+    }
 
     setError(null)
     setIsAnalyzing(true)
     setIsAnalyzeCompleted(false)
-    store.runAnalyzeJob(sessionId, masterResume.id, jobDescription)
+    store.runAnalyzeJob(sessionId, masterResume.id, jobDescription, activeModel)
   }
 
   const handleFinalize = async () => {
@@ -129,7 +144,8 @@ export function AIGenerator({ masterResume, profileId: initialProfileId, onGener
       analysis,
       approvedChanges,
       selectedProfileId || null,
-      selectedProfile?.name || null
+      selectedProfile?.name || null,
+      activeModel
     )
   }
 
@@ -200,23 +216,55 @@ export function AIGenerator({ masterResume, profileId: initialProfileId, onGener
 
         {!analysis ? (
           <div className="space-y-4">
-            {profiles.length > 0 && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {profiles.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-zinc-700">Career Profile</label>
+                  <select
+                    value={selectedProfileId}
+                    onChange={(event) => setSelectedProfileId(event.target.value)}
+                    className="mt-1.5 w-full rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-950 focus:outline-none focus:ring-1 focus:ring-zinc-950"
+                    disabled={isAnalyzing}
+                  >
+                    {profiles.map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
-                <label className="text-sm font-medium">Career profile</label>
+                <label className="text-sm font-medium text-zinc-700">LLM Generation Model</label>
                 <select
-                  value={selectedProfileId}
-                  onChange={(event) => setSelectedProfileId(event.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                  value={modelType}
+                  onChange={(event) => setModelType(event.target.value)}
+                  className="mt-1.5 w-full rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-950 focus:outline-none focus:ring-1 focus:ring-zinc-950"
                   disabled={isAnalyzing}
                 >
-                  {profiles.map((profile) => (
-                    <option key={profile.id} value={profile.id}>
-                      {profile.name}
-                    </option>
-                  ))}
+                  <option value="openai/gpt-4o-mini">GPT-4o Mini (Default)</option>
+                  <option value="google/gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
+                  <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                  <option value="custom">Custom OpenRouter ID...</option>
                 </select>
               </div>
+            </div>
+
+            {modelType === 'custom' && (
+              <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                <label className="text-sm font-medium text-zinc-700">Custom Model Identifier</label>
+                <input
+                  type="text"
+                  placeholder="e.g. meta-llama/llama-3-8b-instruct"
+                  value={customModel}
+                  onChange={(e) => setCustomModel(e.target.value)}
+                  className="mt-1.5 w-full rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-950 focus:outline-none focus:ring-1 focus:ring-zinc-950"
+                  disabled={isAnalyzing}
+                />
+                <p className="mt-1 text-xs text-zinc-500 font-mono">Paste any valid OpenRouter naming scheme string.</p>
+              </div>
             )}
+
             <div>
               <label className="text-sm font-medium">Job Description</label>
               <Textarea
@@ -251,6 +299,37 @@ export function AIGenerator({ masterResume, profileId: initialProfileId, onGener
           </div>
         ) : (
           <div className="space-y-5">
+            {performance && (
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-4 transition-all hover:bg-zinc-50 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 pb-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">LLM Generation Performance KPIs</h3>
+                  <Badge variant="secondary" className="bg-zinc-100 text-zinc-800 hover:bg-zinc-100 text-[10px] font-mono px-2 py-0.5">
+                    {performance.model}
+                  </Badge>
+                </div>
+                <div className="mt-3.5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <div>
+                    <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Latency</p>
+                    <p className="mt-1 text-lg font-semibold text-zinc-900 font-mono">{performance.latency}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Generation Speed</p>
+                    <p className="mt-1 text-lg font-semibold text-zinc-900 font-mono">{performance.speed}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Total Tokens</p>
+                    <p className="mt-1 text-lg font-semibold text-zinc-900 font-mono">{performance.totalTokens.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Prompt / Completion</p>
+                    <p className="mt-1.5 text-xs font-semibold text-zinc-600 font-mono">
+                      {performance.promptTokens.toLocaleString()} / {performance.completionTokens.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <AnalysisSummary analysis={analysis} />
             <ProposedChanges
               changes={analysis.proposedChanges}

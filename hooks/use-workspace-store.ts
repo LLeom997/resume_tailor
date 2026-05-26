@@ -107,7 +107,8 @@ interface WorkspaceState {
   runAnalyzeJob: (
     sessionId: string,
     masterResumeId: string,
-    jobDescription: string
+    jobDescription: string,
+    model?: string
   ) => Promise<void>
   runFinalizeJob: (
     sessionId: string,
@@ -116,7 +117,8 @@ interface WorkspaceState {
     analysis: any,
     approvedChanges: any[],
     profileId: string | null,
-    profileName: string | null
+    profileName: string | null,
+    model?: string
   ) => Promise<void>
   dismissTask: () => void
 }
@@ -319,7 +321,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   }),
   dismissTask: () => set({ activeTask: null }),
 
-  runAnalyzeJob: async (sessionId, masterResumeId, jobDescription) => {
+  runAnalyzeJob: async (sessionId, masterResumeId, jobDescription, model = 'openai/gpt-4o-mini') => {
     const taskId = `analyze-${masterResumeId}-${Date.now()}`
     
     set({
@@ -370,6 +372,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           action: 'analyze',
           master_resume_id: masterResumeId,
           job_description: jobDescription,
+          model,
         }),
       })
 
@@ -407,7 +410,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
   },
 
-  runFinalizeJob: async (sessionId, masterResumeId, jobDescription, analysis, approvedChanges, profileId, profileName) => {
+  runFinalizeJob: async (sessionId, masterResumeId, jobDescription, analysis, approvedChanges, profileId, profileName, model = 'openai/gpt-4o-mini') => {
     const taskId = `finalize-${masterResumeId}-${Date.now()}`
     
     set({
@@ -462,6 +465,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           approved_changes: approvedChanges,
           profile_id: profileId,
           profile_name: profileName,
+          model,
         }),
       })
 

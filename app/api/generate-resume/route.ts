@@ -105,8 +105,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'analyze') {
-      const analysis = await analyzeJobDescription(masterResume.content, body.job_description)
-      return NextResponse.json({ analysis })
+      const { analysis, performance } = await analyzeJobDescription(masterResume.content, body.job_description, body.model)
+      return NextResponse.json({ analysis, performance })
     }
 
     if (action === 'finalize') {
@@ -295,17 +295,33 @@ export async function POST(request: NextRequest) {
 
 async function analyzeJobDescription(
   masterResume: ResumeContent,
-  jobDescription: string
-): Promise<ResumeWorkflowAnalysis> {
+  jobDescription: string,
+  model: string = 'openai/gpt-4o-mini'
+): Promise<{ analysis: ResumeWorkflowAnalysis; performance: any }> {
   const openrouterClient = createOpenRouterClient()
-  const { object } = await generateObject({
-    model: openrouterClient('openai/gpt-4o-mini'),
+  const startTime = Date.now()
+  const { object, usage } = await generateObject({
+    model: openrouterClient(model),
     system: ANALYSIS_PROMPT,
     prompt: `Master Resume JSON:\n${JSON.stringify(masterResume, null, 2)}\n\nJob Description:\n${jobDescription}`,
     schema: workflowAnalysisSchema,
   })
+  const endTime = Date.now()
+  const latencyMs = endTime - startTime
+  const latencySec = latencyMs / 1000
+  const speed = usage ? Math.round((usage as any).totalTokens / latencySec) : 0
 
-  return object
+  return {
+    analysis: object,
+    performance: {
+      model,
+      latency: latencySec.toFixed(1) + 's',
+      promptTokens: (usage as any)?.promptTokens || 0,
+      completionTokens: (usage as any)?.completionTokens || 0,
+      totalTokens: (usage as any)?.totalTokens || 0,
+      speed: speed + ' t/s'
+    }
+  }
 }
 
 async function generateFinalResume(
@@ -335,7 +351,7 @@ async function generateFinalResume(
   if (finalResume.summary) {
     finalResume.summary = finalResume.summary.split('\n').map(formatBulletLabel).join('\n')
   }
-  
+
   if (finalResume.experience) {
     finalResume.experience.forEach(exp => {
       if (exp.summary) {

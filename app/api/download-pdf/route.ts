@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     `
 
     // Inject content and wait for network/font assets to load
-    await page.setContent(content, { waitUntil: 'networkidle0' })
+    await page.setContent(content, { waitUntil: 'networkidle0' as any })
 
     // Generate text-based PDF matching exactly standard A4 dimensions
     const pdfBuffer = await page.pdf({
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     await browser.close()
 
     // Send binary PDF buffer with appropriate file download headers
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(pdfBuffer as any, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
