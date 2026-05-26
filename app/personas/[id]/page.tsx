@@ -8,22 +8,22 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import Link from 'next/link'
 import { parseResumeExportBaseName } from '@/lib/resume-filename'
-import { 
-  ArrowLeft, 
-  Clock, 
-  FileText, 
-  Briefcase, 
-  Sparkles, 
-  Plus, 
-  Zap, 
+import {
+  ArrowLeft,
+  Clock,
+  FileText,
+  Briefcase,
+  Sparkles,
+  Plus,
+  Zap,
   Trash2,
   Share2,
   ExternalLink,
@@ -36,13 +36,13 @@ export default function PersonaWorkspacePage() {
   const router = useRouter()
   const { sessionId, isLoading } = useSession()
   const store = useWorkspaceStore()
-  
+
   const personaId = params.id as string
   const [persona, setPersona] = useState<Persona | null>(() => {
     return store.personas.find(p => p.id === personaId) || null
   })
   const [globalMaster, setGlobalMaster] = useState<any>(null)
-  
+
   const hasCachedVariations = store.variations.some(v => v.persona_id === personaId)
   const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(!hasCachedVariations)
   const [resumesList, setResumesList] = useState<any[]>([])
@@ -80,12 +80,12 @@ export default function PersonaWorkspacePage() {
 
         if (variationsRes.ok) {
           const variations: ResumeVariation[] = await variationsRes.json()
-          
+
           if (personaRes.ok) {
             const list: Persona[] = await personaRes.json()
             const found = list.find(p => p.id === personaId)
             setPersona(found || null)
-            
+
             // Increment usage count on enter
             if (found) {
               await fetch(`/api/personas/${personaId}/usage`, { method: 'POST' })
@@ -171,7 +171,7 @@ export default function PersonaWorkspacePage() {
   const totalVariants = variations.length
   const activeApplications = variations.filter(v => ['applied', 'interview', 'offer'].includes(v.status)).length
   const successCount = variations.filter(v => v.status === 'offer').length
-  
+
   // Find most targeted company using dynamically resolved company names
   const companyCounts = variations.reduce((acc, v) => {
     const { companyName } = getVariationDisplayDetails(v)
@@ -259,7 +259,7 @@ export default function PersonaWorkspacePage() {
         job_id: editJobId,
         job_link: editJobLink
       })
-      
+
       // Update local state list as well
       const updatedResumes = resumesList.map((r) => {
         if (r.id === editingVariation.id) {
@@ -277,7 +277,7 @@ export default function PersonaWorkspacePage() {
         return r
       })
       setResumesList(updatedResumes)
-      
+
       // Refresh page data
       const res = await fetch(`/api/variations?persona_id=${personaId}`, { headers: { 'x-session-id': sessionId! } })
       if (res.ok) {
@@ -301,9 +301,9 @@ export default function PersonaWorkspacePage() {
       <header className="border-b border-zinc-200 bg-white sticky top-0 z-20">
         <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="w-8 h-8"
               onClick={() => router.back()}
             >
@@ -351,7 +351,7 @@ export default function PersonaWorkspacePage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-8">
-        
+
         {/* TOP SECTION: PERSONA ANALYTICS */}
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="shadow-sm border-zinc-200">
@@ -404,11 +404,10 @@ export default function PersonaWorkspacePage() {
                 variant={viewMode === 'card' ? 'secondary' : 'ghost'}
                 size="xs"
                 onClick={() => handleViewModeChange('card')}
-                className={`text-xs px-3 h-7 rounded-md transition-all ${
-                  viewMode === 'card'
+                className={`text-xs px-3 h-7 rounded-md transition-all ${viewMode === 'card'
                     ? 'bg-white shadow-sm font-semibold text-zinc-900'
                     : 'text-zinc-500 hover:text-zinc-900'
-                }`}
+                  }`}
               >
                 Card View
               </Button>
@@ -416,17 +415,16 @@ export default function PersonaWorkspacePage() {
                 variant={viewMode === 'table' ? 'secondary' : 'ghost'}
                 size="xs"
                 onClick={() => handleViewModeChange('table')}
-                className={`text-xs px-3 h-7 rounded-md transition-all ${
-                  viewMode === 'table'
+                className={`text-xs px-3 h-7 rounded-md transition-all ${viewMode === 'table'
                     ? 'bg-white shadow-sm font-semibold text-zinc-900'
                     : 'text-zinc-500 hover:text-zinc-900'
-                }`}
+                  }`}
               >
                 Table View
               </Button>
             </div>
           </div>
-          
+
           {variations.length > 0 || globalMaster ? (
             viewMode === 'card' ? (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-in fade-in duration-200">
@@ -492,7 +490,7 @@ export default function PersonaWorkspacePage() {
                           <span>Version: v{v.version || 1}</span>
                           <span>Updated: {new Date(v.updated_at).toLocaleDateString()}</span>
                         </div>
-                        
+
                         {(jobId || jobLink) && (
                           <div className="flex flex-wrap items-center gap-2 text-[10px] border-t border-zinc-150 pt-2.5">
                             {jobId && (
@@ -501,10 +499,10 @@ export default function PersonaWorkspacePage() {
                               </span>
                             )}
                             {jobLink && (
-                              <a 
-                                href={jobLink.startsWith('http') ? jobLink : `https://${jobLink}`} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
+                              <a
+                                href={jobLink.startsWith('http') ? jobLink : `https://${jobLink}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="text-blue-600 hover:underline inline-flex items-center gap-0.5"
                                 onClick={(e) => e.stopPropagation()}
                               >
@@ -513,14 +511,14 @@ export default function PersonaWorkspacePage() {
                             )}
                           </div>
                         )}
-                        
+
                         <div className="flex items-center gap-2 pt-1 border-t border-zinc-100 mt-2">
                           <Link href={`/preview/${v.id}`} className="flex-1">
                             <Button size="xs" variant="outline" className="w-full text-[11px] gap-1">
                               <ExternalLink className="w-3 h-3" /> Preview
                             </Button>
                           </Link>
-                          
+
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button size="xs" variant="secondary" className="gap-1 text-[11px] cursor-pointer">
@@ -529,8 +527,8 @@ export default function PersonaWorkspacePage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="text-xs">
                               {(['draft', 'tailored', 'applied', 'interview', 'offer', 'closed'] as ResumeStatus[]).map((statusOption) => (
-                                <DropdownMenuItem 
-                                  key={statusOption} 
+                                <DropdownMenuItem
+                                  key={statusOption}
                                   onClick={() => handleStatusChange(v.id, statusOption)}
                                   className="capitalize cursor-pointer"
                                 >
@@ -540,20 +538,20 @@ export default function PersonaWorkspacePage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
 
-                          <Button 
-                            size="xs" 
-                            variant="ghost" 
-                            onClick={() => handleOpenEditModal(v)} 
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            onClick={() => handleOpenEditModal(v)}
                             className="text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100"
                             title="Edit Job Details"
                           >
                             <Settings className="w-3.5 h-3.5" />
                           </Button>
 
-                          <Button 
-                            size="xs" 
-                            variant="ghost" 
-                            onClick={() => handleDelete(v.id)} 
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            onClick={() => handleDelete(v.id)}
                             className="text-zinc-400 hover:text-red-600 hover:bg-red-50"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -611,10 +609,10 @@ export default function PersonaWorkspacePage() {
                             <div className="space-y-0.5">
                               <div>{roleTitle}</div>
                               {jobLink && (
-                                <a 
-                                  href={jobLink.startsWith('http') ? jobLink : `https://${jobLink}`} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
+                                <a
+                                  href={jobLink.startsWith('http') ? jobLink : `https://${jobLink}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
                                   className="text-blue-500 hover:underline text-[10px] inline-flex items-center gap-0.5"
                                 >
                                   Link <ExternalLink className="w-2.5 h-2.5" />
@@ -625,9 +623,9 @@ export default function PersonaWorkspacePage() {
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button 
-                                  variant="outline" 
-                                  size="xs" 
+                                <Button
+                                  variant="outline"
+                                  size="xs"
                                   className={`capitalize px-2 py-0.5 font-semibold text-[10px] h-6 flex items-center gap-1.5 cursor-pointer shadow-xs ${statusColors[v.status] || ''}`}
                                 >
                                   {v.status === 'closed' ? 'position closed' : v.status}
@@ -636,8 +634,8 @@ export default function PersonaWorkspacePage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="start" className="text-xs">
                                 {(['draft', 'tailored', 'applied', 'interview', 'offer', 'closed'] as ResumeStatus[]).map((statusOption) => (
-                                  <DropdownMenuItem 
-                                    key={statusOption} 
+                                  <DropdownMenuItem
+                                    key={statusOption}
                                     onClick={() => handleStatusChange(v.id, statusOption)}
                                     className="capitalize cursor-pointer"
                                   >
@@ -653,10 +651,10 @@ export default function PersonaWorkspacePage() {
                             <Link href={`/preview/${v.id}`}>
                               <Button size="xs" variant="outline" className="text-[10px] py-1">Open</Button>
                             </Link>
-                            <Button 
-                              size="xs" 
-                              variant="ghost" 
-                              onClick={() => handleOpenEditModal(v)} 
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              onClick={() => handleOpenEditModal(v)}
                               className="text-zinc-450 hover:text-zinc-800 hover:bg-zinc-100"
                               title="Edit Job Details"
                             >
@@ -691,14 +689,14 @@ export default function PersonaWorkspacePage() {
               <h3 className="font-bold text-zinc-900 text-base">Edit Job Details</h3>
               <p className="text-xs text-zinc-500">Update target details for this resume variation.</p>
             </div>
-            
+
             <div className="space-y-3 text-xs">
               <div className="space-y-1">
                 <label className="font-semibold text-zinc-700">Company Name</label>
-                <input 
-                  type="text" 
-                  value={editCompany} 
-                  onChange={(e) => setEditCompany(e.target.value)} 
+                <input
+                  type="text"
+                  value={editCompany}
+                  onChange={(e) => setEditCompany(e.target.value)}
                   className="w-full px-3 py-2 border border-zinc-200 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-400 text-zinc-800 bg-white"
                   placeholder="e.g. Google"
                 />
@@ -706,10 +704,10 @@ export default function PersonaWorkspacePage() {
 
               <div className="space-y-1">
                 <label className="font-semibold text-zinc-700">Role Title</label>
-                <input 
-                  type="text" 
-                  value={editRole} 
-                  onChange={(e) => setEditRole(e.target.value)} 
+                <input
+                  type="text"
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value)}
                   className="w-full px-3 py-2 border border-zinc-200 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-400 text-zinc-800 bg-white"
                   placeholder="e.g. Senior Software Engineer"
                 />
@@ -717,10 +715,10 @@ export default function PersonaWorkspacePage() {
 
               <div className="space-y-1">
                 <label className="font-semibold text-zinc-700">Job ID (from JD)</label>
-                <input 
-                  type="text" 
-                  value={editJobId} 
-                  onChange={(e) => setEditJobId(e.target.value)} 
+                <input
+                  type="text"
+                  value={editJobId}
+                  onChange={(e) => setEditJobId(e.target.value)}
                   className="w-full px-3 py-2 border border-zinc-200 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-400 text-zinc-800 bg-white"
                   placeholder="e.g. REQ-12345"
                 />
@@ -728,10 +726,10 @@ export default function PersonaWorkspacePage() {
 
               <div className="space-y-1">
                 <label className="font-semibold text-zinc-700">Job Posting Link</label>
-                <input 
-                  type="text" 
-                  value={editJobLink} 
-                  onChange={(e) => setEditJobLink(e.target.value)} 
+                <input
+                  type="text"
+                  value={editJobLink}
+                  onChange={(e) => setEditJobLink(e.target.value)}
                   className="w-full px-3 py-2 border border-zinc-200 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-400 text-zinc-800 bg-white"
                   placeholder="e.g. https://careers.google.com/jobs/..."
                 />
@@ -739,18 +737,18 @@ export default function PersonaWorkspacePage() {
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setEditingVariation(null)} 
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditingVariation(null)}
                 disabled={isSavingDetails}
                 className="text-xs"
               >
                 Cancel
               </Button>
-              <Button 
-                size="sm" 
-                onClick={handleSaveDetails} 
+              <Button
+                size="sm"
+                onClick={handleSaveDetails}
                 disabled={isSavingDetails}
                 className="text-xs shadow-sm bg-zinc-900 text-white hover:bg-zinc-800"
               >
