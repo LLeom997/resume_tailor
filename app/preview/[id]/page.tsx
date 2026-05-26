@@ -7,9 +7,10 @@ import { Resume } from '@/lib/types'
 import { ResumePreview } from '@/components/resume-preview'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
-import { ArrowLeft, Download, Loader2, Printer, ChevronDown, ChevronUp, History, Settings } from 'lucide-react'
+import { ArrowLeft, Download, Loader2, Printer, ChevronDown, ChevronUp, History, Settings, Sparkles, Send, Check, Undo2 } from 'lucide-react'
 import { exportResumePdf } from '@/lib/export-resume-pdf'
 import { applyResumeScale, clearResumeScale } from '@/lib/resume-export-scale'
 import {
@@ -37,7 +38,7 @@ export default function PreviewPage() {
 
   const id = params.id as string
 
-  const [activeTab, setActiveTab] = useState<'edit' | 'history'>('edit')
+  const [activeTab, setActiveTab] = useState<'edit' | 'ai' | 'history'>('edit')
   const [historyList, setHistoryList] = useState<any[]>([])
   
   // Basic states for editing sections
@@ -47,6 +48,17 @@ export default function PreviewPage() {
   const [editedExperience, setEditedExperience] = useState<any[]>([])
   const [editedProjects, setEditedProjects] = useState<any[]>([])
   
+  // AI Co-Pilot states
+  const [aiTarget, setAiTarget] = useState<string>('summary')
+  const [aiPrompt, setAiPrompt] = useState<string>('')
+  const [aiIsGenerating, setAiIsGenerating] = useState(false)
+  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
+
+  // ATS Keyword Highlights states
+  const [isKeywordHighlightActive, setIsKeywordHighlightActive] = useState(true)
+  const [newKeywordInput, setNewKeywordInput] = useState('')
+
   // Section expand toggle
   const [expandedSection, setExpandedSection] = useState<string | null>('basics')
 
@@ -281,9 +293,150 @@ export default function PreviewPage() {
       fetchHistory()
     } catch (e) {
       console.error(e)
+    }
+  }
+
+  const handleAiRewrite = async () => {
+    if (!sessionId) return
+    setAiIsGenerating(true)
+    setAiError(null)
+    setAiSuggestion(null)
+
+    let currentText = ''
+    if (aiTarget === 'summary') {
+      currentText = editedSummary
+    } else if (aiTarget.startsWith('experience-')) {
+      const id = aiTarget.replace('experience-', '')
+      currentText = editedExperience.find(e => e.id === id)?.summary || ''
+    } else if (aiTarget.startsWith('projects-')) {
+      const id = aiTarget.replace('projects-', '')
+      currentText = editedProjects.find(p => p.id === id)?.description || ''
+    }
+
+    try {
+      const response = await fetch('/api/ai-rewrite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-id': sessionId,
+        },
+        body: JSON.stringify({
+          text: currentText,
+          instruction: aiPrompt,
+          context: resume?.jd_text || ''
+        })
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to rewrite')
+      }
+
+      setAiSuggestion(data.rewrittenText)
+    } catch (e: any) {
+      console.error(e)
+      setAiError(e.message || 'Error occurred while calling AI rewrite API')
+    } finally {
+      setAiIsGenerating(false)
+    }
+  }
+
+  const handleApplyAiRewrite = () => {
+    if (!aiSuggestion) return
+
+    if (aiTarget === 'summary') {
+      setEditedSummary(aiSuggestion)
+      saveSectionChanges('summary', { summary: aiSuggestion }, 'AI Rewrite: Professional Summary')
+    } else if (aiTarget.startsWith('experience-')) {
+      const id = aiTarget.replace('experience-', '')
+      const expItem = editedExperience.find(e => e.id === id)
+      const company = expItem?.company || 'Company'
+      const updated = editedExperience.map((e) => {
+        if (e.id === id) {
+          return { ...e, summary: aiSuggestion }
+        }
+        return e
+      })
+      setEditedExperience(updated)
+      saveSectionChanges('experience', { experience: updated }, `AI Rewrite: Work Experience at ${company}`)
+    } else if (aiTarget.startsWith('projects-')) {
+      const id = aiTarget.replace('projects-', '')
+      const projItem = editedProjects.find(p => p.id === id)
+      const name = projItem?.name || 'Project'
+      const updated = editedProjects.map((p) => {
+        if (p.id === id) {
+          return { ...p, description: aiSuggestion }
+        }
+        return p
+      })
+      setEditedProjects(updated)
+      saveSectionChanges('projects', { projects: updated }, `AI Rewrite: Project ${name}`)
+    }
+
+    setAiSuggestion(null)
+    setAiPrompt('')
+  }
+
+  const handleAddKeyword = async () => {
+    if (!newKeywordInput.trim() || !resume) return
+    const cleaned = newKeywordInput.trim()
+    if (highlightKeywords.includes(cleaned)) {
+      setNewKeywordInput('')
+      return
+    }
+
+    const updatedKeywords = [...highlightKeywords, cleaned]
+    setHighlightKeywords(updatedKeywords)
+    setNewKeywordInput('')
+
+    await saveKeywordsToDb(updatedKeywords)
+  }
+
+  const handleRemoveKeyword = async (keywordToRemove: string) => {
+    if (!resume) return
+    const updatedKeywords = highlightKeywords.filter(k => k !== keywordToRemove)
+    setHighlightKeywords(updatedKeywords)
+
+    await saveKeywordsToDb(updatedKeywords)
+  }
+
+  const saveKeywordsToDb = async (updatedKeywords: string[]) => {
+    if (!sessionId || !resume) return
+    
+    const currentMeta = resume.export_meta || {}
+    const updatedMeta = {
+      ...currentMeta,
+      keywords: updatedKeywords
+    }
+
+    setSaveStatus('saving')
+    try {
+      const response = await fetch(`/api/resumes/${resume.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-id': sessionId,
+        },
+        body: JSON.stringify({
+          name: resume.name,
+          content: resume.content,
+          export_meta: updatedMeta,
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save keywords')
+      }
+
+      const updatedResume = await response.json()
+      setResume(updatedResume)
+      setSaveStatus('saved')
+    } catch (e) {
+      console.error(e)
       setSaveStatus('error')
     }
   }
+
   const saveVariantName = useCallback(async () => {
     if (!sessionId || !resume || resume.is_master) return
 
@@ -508,7 +661,7 @@ export default function PreviewPage() {
               <ResumePreview
                 content={resume.content}
                 template={template}
-                highlightKeywords={!resume.is_master ? highlightKeywords : []}
+                highlightKeywords={!resume.is_master && isKeywordHighlightActive ? highlightKeywords : []}
               />
             </div>
           </div>
@@ -519,12 +672,12 @@ export default function PreviewPage() {
               <CardHeader className="pb-3 border-b border-zinc-100 flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-sm font-bold text-zinc-800">Workspace Editor</CardTitle>
-                  <CardDescription className="text-[10px] mt-0.5">Edit sections or view snapshot history</CardDescription>
+                  <CardDescription className="text-[10px] mt-0.5 font-medium">Refine resume details with AI or snapshot logs</CardDescription>
                 </div>
                 <div className="flex bg-zinc-100 p-0.5 rounded-md border border-zinc-200">
                   <button
                     onClick={() => setActiveTab('edit')}
-                    className={`text-xs px-2.5 py-1 rounded-sm font-medium transition-all ${
+                    className={`text-xs px-2 py-1 rounded-sm font-medium transition-all cursor-pointer ${
                       activeTab === 'edit'
                         ? 'bg-white shadow-xs text-zinc-900 font-semibold border border-zinc-150'
                         : 'text-zinc-500 hover:text-zinc-850'
@@ -533,8 +686,18 @@ export default function PreviewPage() {
                     Edit
                   </button>
                   <button
+                    onClick={() => setActiveTab('ai')}
+                    className={`text-xs px-2 py-1 rounded-sm font-medium transition-all flex items-center gap-1 cursor-pointer ${
+                      activeTab === 'ai'
+                        ? 'bg-white shadow-xs text-zinc-900 font-semibold border border-zinc-150'
+                        : 'text-zinc-500 hover:text-zinc-850'
+                    }`}
+                  >
+                    <Sparkles className="w-3 h-3 text-blue-500 animate-pulse" /> AI Assist
+                  </button>
+                  <button
                     onClick={() => setActiveTab('history')}
-                    className={`text-xs px-2.5 py-1 rounded-sm font-medium transition-all ${
+                    className={`text-xs px-2 py-1 rounded-sm font-medium transition-all cursor-pointer ${
                       activeTab === 'history'
                         ? 'bg-white shadow-xs text-zinc-900 font-semibold border border-zinc-150'
                         : 'text-zinc-500 hover:text-zinc-850'
@@ -614,7 +777,18 @@ export default function PreviewPage() {
                       {expandedSection === 'summary' && (
                         <div className="p-3 space-y-2 text-[11px] bg-white">
                           <div className="space-y-1">
-                            <label className="font-semibold text-zinc-650">Summary Text</label>
+                            <div className="flex items-center justify-between">
+                              <label className="font-semibold text-zinc-650">Summary Text</label>
+                              <button
+                                onClick={() => {
+                                  setAiTarget('summary')
+                                  setActiveTab('ai')
+                                }}
+                                className="text-[10px] text-blue-650 hover:text-blue-750 flex items-center gap-1 font-semibold cursor-pointer bg-blue-50/50 hover:bg-blue-50 px-1.5 py-0.5 rounded transition"
+                              >
+                                <Sparkles className="w-2.5 h-2.5 text-blue-500" /> AI Rewrite
+                              </button>
+                            </div>
                             <textarea
                               value={editedSummary}
                               onChange={(e) => setEditedSummary(e.target.value)}
@@ -645,6 +819,15 @@ export default function PreviewPage() {
                             <div key={exp.id} className="space-y-1.5 border-b border-zinc-100 pb-2.5 last:border-0 last:pb-0">
                               <div className="flex items-center justify-between">
                                 <span className="font-bold text-zinc-800">{exp.company} | {exp.position}</span>
+                                <button
+                                  onClick={() => {
+                                    setAiTarget(`experience-${exp.id}`)
+                                    setActiveTab('ai')
+                                  }}
+                                  className="text-[10px] text-blue-650 hover:text-blue-750 flex items-center gap-1 font-semibold cursor-pointer bg-blue-50/50 hover:bg-blue-50 px-1.5 py-0.5 rounded transition"
+                                >
+                                  <Sparkles className="w-2.5 h-2.5 text-blue-500" /> AI Rewrite
+                                </button>
                               </div>
                               <textarea
                                 value={exp.summary}
@@ -706,7 +889,18 @@ export default function PreviewPage() {
                         <div className="p-3 space-y-3 text-[11px] bg-white font-sans">
                           {editedProjects.map((proj) => (
                             <div key={proj.id} className="space-y-1.5 border-b border-zinc-100 pb-2.5 last:border-0 last:pb-0">
-                              <span className="font-bold text-zinc-800">{proj.name}</span>
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-zinc-800">{proj.name}</span>
+                                <button
+                                  onClick={() => {
+                                    setAiTarget(`projects-${proj.id}`)
+                                    setActiveTab('ai')
+                                  }}
+                                  className="text-[10px] text-blue-650 hover:text-blue-750 flex items-center gap-1 font-semibold cursor-pointer bg-blue-50/50 hover:bg-blue-50 px-1.5 py-0.5 rounded transition"
+                                >
+                                  <Sparkles className="w-2.5 h-2.5 text-blue-500" /> AI Rewrite
+                                </button>
+                              </div>
                               <textarea
                                 value={proj.description}
                                 onChange={(e) => handleSaveProjects(proj.id, e.target.value)}
@@ -721,6 +915,154 @@ export default function PreviewPage() {
                         </div>
                       )}
                     </div>
+                  </div>
+                ) : activeTab === 'ai' ? (
+                  <div className="space-y-4 text-xs font-medium">
+                    {/* TARGET BLOCK SELECTOR */}
+                    <div className="space-y-1">
+                      <label className="text-zinc-650 font-semibold">Target Section / Block</label>
+                      <select
+                        value={aiTarget}
+                        onChange={(e) => {
+                          setAiTarget(e.target.value)
+                          setAiSuggestion(null)
+                        }}
+                        className="w-full h-8 rounded-md border border-zinc-350 bg-white px-2 text-xs font-semibold text-zinc-800"
+                      >
+                        <option value="summary">✍️ Professional Summary</option>
+                        {editedExperience.map((exp) => (
+                          <option key={exp.id} value={`experience-${exp.id}`}>
+                            💼 Experience: {exp.company || 'Unnamed Company'} ({exp.position || 'No Title'})
+                          </option>
+                        ))}
+                        {editedProjects.map((proj) => (
+                          <option key={proj.id} value={`projects-${proj.id}`}>
+                            📁 Project: {proj.name || 'Unnamed Project'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* CURRENT TEXT PREVIEW */}
+                    <div className="space-y-1">
+                      <label className="text-zinc-500 font-bold uppercase tracking-wider text-[9px]">Current Text Block</label>
+                      <div className="bg-zinc-50 p-2.5 border border-zinc-200 rounded-md max-h-32 overflow-y-auto text-[10px] font-mono text-zinc-600 leading-normal select-all">
+                        {aiTarget === 'summary' ? (
+                          editedSummary || '(Empty)'
+                        ) : aiTarget.startsWith('experience-') ? (
+                          editedExperience.find(e => e.id === aiTarget.replace('experience-', ''))?.summary || '(Empty)'
+                        ) : aiTarget.startsWith('projects-') ? (
+                          editedProjects.find(p => p.id === aiTarget.replace('projects-', ''))?.description || '(Empty)'
+                        ) : '(Select Target)'}
+                      </div>
+                    </div>
+
+                    {/* AI INSTRUCTION INPUT */}
+                    <div className="space-y-1.5">
+                      <label className="text-zinc-650 font-semibold">AI Assistant Instructions</label>
+                      <textarea
+                        value={aiPrompt}
+                        onChange={(e) => setAiPrompt(e.target.value)}
+                        placeholder="e.g. Rewrite to sound more technical, add engineering outcomes, or make shorter..."
+                        rows={3}
+                        className="w-full px-3 py-2 text-xs border border-zinc-350 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-400 text-zinc-800 bg-white"
+                      />
+                    </div>
+
+                    {/* PRESET TAG BUTTONS */}
+                    <div className="space-y-1">
+                      <label className="text-zinc-500 font-bold uppercase tracking-wider text-[9px]">Preset Prompt Templates</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          onClick={() => setAiPrompt("Rewrite this to be highly result-driven, adding measurable metrics, percentages, and financial or operational impact outcomes.")}
+                          className="bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-2 py-1 rounded text-[10px] font-medium border border-zinc-250 transition cursor-pointer"
+                        >
+                          📈 Add Metrics & Impact
+                        </button>
+                        <button
+                          onClick={() => setAiPrompt("Rewrite this to sound more technically advanced, emphasizing technical architecture, domain-specific tools, and expert methodologies.")}
+                          className="bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-2 py-1 rounded text-[10px] font-medium border border-zinc-250 transition cursor-pointer"
+                        >
+                          💻 Make More Technical
+                        </button>
+                        <button
+                          onClick={() => setAiPrompt("Rewrite this to be extremely concise, punchy, and clear while retaining all key achievements.")}
+                          className="bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-2 py-1 rounded text-[10px] font-medium border border-zinc-250 transition cursor-pointer"
+                        >
+                          ✂️ Shorten & Condense
+                        </button>
+                        <button
+                          onClick={() => setAiPrompt("Optimize this statement to organically integrate high-impact domain keywords relevant to standard ATS filtering.")}
+                          className="bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-2 py-1 rounded text-[10px] font-medium border border-zinc-250 transition cursor-pointer"
+                        >
+                          🎯 ATS Keywords
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* ACTION TRIGGERS */}
+                    {aiError && (
+                      <p className="text-[11px] text-red-650 bg-red-50 p-2 rounded border border-red-200 leading-normal">
+                        ⚠️ {aiError}
+                      </p>
+                    )}
+
+                    <Button
+                      onClick={handleAiRewrite}
+                      disabled={aiIsGenerating || !aiPrompt.trim()}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-md cursor-pointer h-9 text-xs"
+                    >
+                      {aiIsGenerating ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Streaming Co-Pilot rewrite...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-3.5 h-3.5" />
+                          Run AI Optimization
+                        </>
+                      )}
+                    </Button>
+
+                    {/* AI REWRITE DRAFT PREVIEW (DIFF CARD) */}
+                    {aiSuggestion && (
+                      <div className="border border-emerald-200 rounded-lg overflow-hidden bg-emerald-50/10 shadow-lg animate-in fade-in duration-300">
+                        <div className="bg-emerald-50 px-3 py-2 border-b border-emerald-100 flex items-center justify-between text-emerald-800 text-[10px] font-bold uppercase tracking-wider">
+                          <span>✨ AI Optimize Draft Proposal</span>
+                          <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded text-[9px] font-mono">100% facts-grounded</span>
+                        </div>
+                        <div className="p-3 text-[11px] text-zinc-700 leading-relaxed font-sans whitespace-pre-line bg-white border-b border-emerald-100">
+                          {(() => {
+                            let currentText = ''
+                            if (aiTarget === 'summary') {
+                              currentText = editedSummary
+                            } else if (aiTarget.startsWith('experience-')) {
+                              const id = aiTarget.replace('experience-', '')
+                              currentText = editedExperience.find(e => e.id === id)?.summary || ''
+                            } else if (aiTarget.startsWith('projects-')) {
+                              const id = aiTarget.replace('projects-', '')
+                              currentText = editedProjects.find(p => p.id === id)?.description || ''
+                            }
+                            return getHighlightedDiff(currentText, aiSuggestion)
+                          })()}
+                        </div>
+                        <div className="flex gap-2 p-2 bg-emerald-50/30">
+                          <button
+                            onClick={() => setAiSuggestion(null)}
+                            className="flex-1 bg-white hover:bg-zinc-150 border border-zinc-300 text-zinc-700 h-8 rounded text-[11px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
+                          >
+                            <Undo2 className="w-3 h-3 text-zinc-500" /> Discard
+                          </button>
+                          <button
+                            onClick={handleApplyAiRewrite}
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-8 rounded text-[11px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
+                          >
+                            <Check className="w-3 h-3 text-white" /> Apply Changes
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -751,6 +1093,94 @@ export default function PreviewPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* ATS KEYWORD HIGHLIGHTS CARD */}
+            {!resume.is_master && (
+              <Card className="shadow-sm border-zinc-200 bg-white">
+                <CardHeader className="pb-3 border-b border-zinc-100 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-bold text-zinc-800">ATS Keyword Highlights</CardTitle>
+                    <CardDescription className="text-[10px] mt-0.5 font-medium">Verify keyword presence inside the A4 template</CardDescription>
+                  </div>
+                  <Badge variant="secondary" className="text-[9px] font-mono px-1.5 py-0.5">
+                    {highlightKeywords.length} terms
+                  </Badge>
+                </CardHeader>
+
+                <CardContent className="pt-4 space-y-4">
+                  {/* TOGGLE VISUAL HIGHLIGHTS */}
+                  <div className="flex items-center justify-between text-xs pb-3 border-b border-zinc-100">
+                    <span className="font-semibold text-zinc-700">Highlight matched terms in preview</span>
+                    <button
+                      onClick={() => setIsKeywordHighlightActive(!isKeywordHighlightActive)}
+                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        isKeywordHighlightActive ? 'bg-blue-600' : 'bg-zinc-250'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                          isKeywordHighlightActive ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* ADD DYNAMIC KEYWORD FORM */}
+                  <div className="space-y-1.5 text-xs">
+                    <label className="font-semibold text-zinc-650">Add custom keyword to highlight</label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="e.g. ROS2, TypeScript, API..."
+                        value={newKeywordInput}
+                        onChange={(e) => setNewKeywordInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            handleAddKeyword()
+                          }
+                        }}
+                        className="h-8 text-xs font-mono"
+                      />
+                      <Button
+                        size="xs"
+                        onClick={handleAddKeyword}
+                        disabled={!newKeywordInput.trim()}
+                        className="bg-zinc-900 text-white hover:bg-zinc-800 px-3 cursor-pointer h-8 text-[11px] font-semibold"
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* ACTIVE KEYWORDS CLUSTER */}
+                  <div className="space-y-2 border-t border-zinc-100 pt-3">
+                    <span className="text-zinc-500 font-bold uppercase tracking-wider text-[9px]">Matched Active Keywords</span>
+                    {highlightKeywords.length === 0 ? (
+                      <p className="text-[10px] text-zinc-400 leading-normal">
+                        No keywords currently selected. Type custom keywords above to highlight matches in real-time.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+                        {highlightKeywords.map((kw, i) => (
+                          <span
+                            key={`${kw}-${i}`}
+                            className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] font-mono border border-blue-100 transition"
+                          >
+                            <span>{kw}</span>
+                            <button
+                              onClick={() => handleRemoveKeyword(kw)}
+                              className="text-blue-400 hover:text-blue-600 font-bold text-[9px] w-3 h-3 rounded-full hover:bg-blue-100/50 flex items-center justify-center cursor-pointer"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
@@ -766,3 +1196,37 @@ const sectionLinks = [
   { id: 'experience', label: 'Experience' },
   { id: 'languages', label: 'Languages' },
 ]
+
+function getHighlightedDiff(original: string, rewritten: string) {
+  if (!original) return <span>{rewritten}</span>
+
+  const origWords = original
+    .split(/\s+/)
+    .map(w => w.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").toLowerCase())
+    .filter(Boolean)
+  const origSet = new Set(origWords)
+
+  const rewrittenTokens = rewritten.split(/(\s+)/)
+
+  return (
+    <>
+      {rewrittenTokens.map((token, index) => {
+        if (token.trim() === '') {
+          return <span key={index}>{token}</span>
+        }
+
+        const cleanWord = token.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").toLowerCase()
+
+        if (cleanWord && !origSet.has(cleanWord)) {
+          return (
+            <mark key={index} className="bg-yellow-200 text-zinc-900 px-0.5 rounded font-semibold">
+              {token}
+            </mark>
+          )
+        }
+
+        return <span key={index}>{token}</span>
+      })}
+    </>
+  )
+}
